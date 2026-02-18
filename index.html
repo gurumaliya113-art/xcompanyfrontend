@@ -7,24 +7,9 @@
     <title>frontend</title>
     <script type="module" crossorigin src="./landing_assets/index-Dur577wo.js"></script>
     <link rel="stylesheet" crossorigin href="./landing_assets/index-Hrx1Im0O.css">
-    <style>
-      /* Hide any in-app Admin Login links (keep only our global button) */
-      a[href="/admin-login"]:not(#global-admin-login),
-      a[href="admin-login"]:not(#global-admin-login),
-      a[href$="/admin-login"]:not(#global-admin-login),
-      a[href$="admin-login"]:not(#global-admin-login),
-      a[href*="admin-login"]:not(#global-admin-login) {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-    </style>
+    <link rel="stylesheet" href="./css/luxury-theme.css">
   </head>
   <body>
-    <div id="global-login-switcher" style="position: fixed; top: 50%; right: 16px; transform: translateY(-50%); z-index: 50; display: flex; flex-direction: column; gap: 10px;">
-      <a id="global-admin-login" href="/admin-login" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">Admin Login</a>
-      <button id="global-company-login" type="button" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">Company Login</button>
-    </div>
     <div id="root"></div>
 
     <script>
@@ -47,14 +32,11 @@
         }
 
         function removeDuplicateAdminLoginButtons() {
-          var switcher = document.getElementById('global-login-switcher');
-
           // Hide links whose href points to admin-login
           var links = document.querySelectorAll('a');
           for (var i = 0; i < links.length; i++) {
             var a = links[i];
-            if (a.id === 'global-admin-login') continue;
-            if (switcher && switcher.contains(a)) continue;
+            if (a.id === 'nav-admin-login') continue;
 
             var href = a.getAttribute('href');
             if (looksLikeAdminLoginHref(href)) {
@@ -72,7 +54,6 @@
           var buttons = document.querySelectorAll('button');
           for (var j = 0; j < buttons.length; j++) {
             var b = buttons[j];
-            if (switcher && switcher.contains(b)) continue;
             var btxt = (b.textContent || '').trim().toLowerCase();
             if (btxt === 'admin login' || btxt === 'admin') {
               hideElement(b);
@@ -90,13 +71,68 @@
 
     <script>
       (function () {
-        var a = document.getElementById('global-company-login');
-        if (!a) return;
-        a.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          window.location.href = '/founder-login.html';
-        }, true);
+        function normText(t){
+          try { return String(t || '').replace(/\s+/g,' ').trim().toLowerCase(); }
+          catch(e){ return ''; }
+        }
+
+        function makeNavItemLike(anchor, text, href, id){
+          var el = anchor.cloneNode(true);
+          el.textContent = text;
+          el.setAttribute('href', href);
+          if (id) el.id = id;
+          return el;
+        }
+
+        function tryInjectIntoTopNav(){
+          if (document.getElementById('nav-admin-login') || document.getElementById('nav-company-login')) return true;
+
+          // Find the existing navbar link pattern (use the Enquire link as an anchor)
+          var anchors = Array.prototype.slice.call(document.querySelectorAll('a'));
+          var enquire = null;
+          for (var i=0;i<anchors.length;i++){
+            var a = anchors[i];
+            var t = normText(a.textContent);
+            if (t === 'enquire') { enquire = a; break; }
+          }
+          if (!enquire || !enquire.parentElement) return false;
+
+          var parent = enquire.parentElement;
+
+          var adminA = makeNavItemLike(enquire, 'Admin', '/admin-login', 'nav-admin-login');
+          var companyA = makeNavItemLike(enquire, 'Company', '/founder-login.html', 'nav-company-login');
+
+          parent.appendChild(adminA);
+          parent.appendChild(companyA);
+
+          // Force hard navigation for company login (avoid SPA router interceptions)
+          companyA.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = '/founder-login.html';
+          }, true);
+
+          // Ensure admin login is also reachable even if router handlers exist
+          adminA.addEventListener('click', function (e) {
+            // Allow router to handle if it wants, but also ensure the URL is correct.
+            // If a handler prevented default, we still hard-navigate.
+            setTimeout(function(){
+              if (window.location.pathname !== '/admin-login') {
+                window.location.href = '/admin-login';
+              }
+            }, 0);
+          }, true);
+
+          return true;
+        }
+
+        // Run now and also observe for SPA-rendered header.
+        if (!tryInjectIntoTopNav()) {
+          var mo = new MutationObserver(function(){
+            if (tryInjectIntoTopNav()) mo.disconnect();
+          });
+          mo.observe(document.documentElement, { childList: true, subtree: true });
+        }
       })();
     </script>
   </body>
