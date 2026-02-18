@@ -41,7 +41,7 @@ function loginAsEmployee(id, name){
 async function loadUserPanel(){
   const { data: auth } = await sb.auth.getUser();
   if(!auth.user){
-    window.location.href = "index.html";
+    window.location.href = "dashboard.html";
     return;
   }
 
@@ -51,15 +51,27 @@ async function loadUserPanel(){
     .from("employees")
     .select("role")
     .eq("email", email)
-    .single();
+    .maybeSingle();
 
   if(!emp){
+    const { data: adminUser } = await sb
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+
+    if(adminUser){
+      showDashboard();
+      return;
+    }
+
     alert("No role found");
+    window.location.href = "dashboard.html";
     return;
   }
 
   if(emp.role === "FOUNDER"){
-    showLayersHome();
+    showDashboard();
   }
   else if(emp.role === "HR"){
     showHRDashboard();

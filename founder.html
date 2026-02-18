@@ -399,7 +399,18 @@
   });
 
   /* LOAD DEFAULT */
-  showDashboard();
+  title.innerText = "Company Dashboard";
+  content.innerHTML = `
+    <div class="container">
+      <div class="card">Loading dashboard...</div>
+    </div>
+  `;
+
+  window.addEventListener("load", () => {
+    if (typeof loadUserPanel === "function") {
+      loadUserPanel();
+    }
+  });
   async function saveDailyReport(businessId){
   const date = document.getElementById("rep_date").value;
   const income = Number(document.getElementById("rep_income").value || 0);

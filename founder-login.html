@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Founder Login – The X Company</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{ display:flex; align-items:center; justify-content:center; }
+    .login-popup {
+      padding: 48px 36px 36px 36px;
+      width: 350px;
+      animation: fadeIn 1.2s cubic-bezier(.77,0,.18,1) forwards;
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; transform: scale(1); }
+    }
+    .login-title {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #222;
+      text-align: center;
+      margin-bottom: 18px;
+      text-shadow: 0 2px 8px #fff3;
+    }
+    .login-desc {
+      color: #555;
+      text-align: center;
+      font-size: 1.05rem;
+      margin-bottom: 32px;
+      opacity: 0.8;
+    }
+    .login-input {
+      width: 100%;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      border-radius: 12px;
+      border: none;
+      background: #f3f4f8;
+      color: #222;
+      font-size: 1.08rem;
+      font-family: inherit;
+      box-shadow: 0 2px 8px #e2e4ea;
+      outline: none;
+      transition: background 0.2s;
+    }
+    .login-input:focus {
+      background: #e2e4ea;
+    }
+    .login-btn {
+      width: 100%;
+      margin-top: 8px;
+    }
+    #msg {
+      color: #dc2626;
+      text-align: center;
+      margin-top: 18px;
+      font-size: 1.05rem;
+      min-height: 24px;
+      white-space: pre-line;
+    }
+    @media (max-width: 500px) {
+      .login-popup { width: 98vw; padding: 32px 8vw; }
+    }
+  </style>
+</head>
+<body class="x-theme">
+
+<div class="login-popup">
+  <div class="login-title">The X Company</div>
+  <div class="login-desc">Multi-Billionaire Login System<br>Welcome to the future of work.</div>
+
+  <input id="email" class="login-input" type="email" placeholder="Email">
+  <input id="password" class="login-input" type="password" placeholder="Password">
+  <input id="invite" class="login-input" type="text" placeholder="Invite Code (for Create Account)">
+
+  <button class="login-btn" onclick="signIn()">Sign In</button>
+  <button class="login-btn" onclick="createAccount()">Create Account</button>
+
+  <div id="msg"></div>
+</div>
+
+<script>
+const sb = supabase.createClient(
+  "https://ecjxynuccpncwsogezos.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
+);
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text || "";
+}
+
+async function signIn(){
+  setMsg("");
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){
+    setMsg(error.message);
+    return;
+  }
+
+  window.location.href = "founder.html";
+}
+
+async function createAccount(){
+  setMsg("");
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const invite = (document.getElementById("invite").value || "").trim();
+
+  if(invite !== "KALUA"){
+    setMsg("Invalid invite code");
+    return;
+  }
+
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if(error){
+    setMsg(error.message);
+    return;
+  }
+
+  if(!data.session){
+    setMsg("Account created. If email confirmation is enabled, verify email then Sign In.");
+    return;
+  }
+
+  const { data: claimed, error: claimErr } = await sb.rpc("claim_admin", { invite_code: invite });
+  if(claimErr || !claimed){
+    const details = claimErr ? (claimErr.message || JSON.stringify(claimErr)) : `returned: ${String(claimed)}`;
+    setMsg("Logged in but invite claim failed.\n" + details + "\n\nFix: run backend/sql/admin_login_intake.sql in Supabase SQL Editor (to create claim_admin + KALUA invite).");
+    return;
+  }
+
+  window.location.href = "founder.html";
+}
+</script>
+
+</body>
+</html>
