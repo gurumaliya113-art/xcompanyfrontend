@@ -240,6 +240,307 @@
       border-radius: 10px !important;
     }
 
+    /* ===== Business Portfolio Dashboard (Businesses panel redesign) ===== */
+    .bp-page{
+      width:100%;
+      background:#F9FAFB;
+      border:1px solid rgba(0,0,0,.06);
+      border-radius: 12px;
+      overflow:hidden;
+    }
+    .bp-container{
+      max-width:1280px;
+      margin:0 auto;
+      padding:0 24px;
+    }
+    .bp-header{
+      background:#FFFFFF;
+      border-bottom:1px solid #E5E7EB;
+      padding:24px 0;
+    }
+    .bp-header-inner{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      flex-wrap:wrap;
+    }
+    .bp-title{
+      font-size:30px;
+      line-height:1.1;
+      color:#111827;
+      margin:0;
+      font-weight:700;
+      letter-spacing:.2px;
+    }
+    .bp-subtitle{
+      margin-top:6px;
+      font-size:13px;
+      color:#6B7280;
+    }
+    .bp-total{
+      text-align:right;
+      min-width:220px;
+    }
+    .bp-total-label{
+      font-size:13px;
+      color:#6B7280;
+      margin-bottom:4px;
+    }
+    .bp-total-value{
+      font-size:30px;
+      line-height:1.1;
+      color:#111827;
+      font-weight:700;
+    }
+    .bp-main{ padding:32px 0; }
+
+    .bp-summary-grid{
+      display:grid;
+      grid-template-columns: repeat(5, minmax(0,1fr));
+      gap:16px;
+      margin-bottom:32px;
+    }
+    .bp-summary-card{
+      background:#fff;
+      border:1px solid #F3F4F6;
+      border-radius:8px;
+      padding:24px;
+    }
+    .bp-row{ display:flex; align-items:center; gap:12px; }
+    .bp-ic{
+      padding:12px;
+      border-radius:12px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .bp-label{ font-size:12px; color:#6B7280; margin-bottom:4px; }
+    .bp-value{ font-size:18px; color:#111827; font-weight:700; }
+
+    .bp-section-title{
+      font-size:20px;
+      color:#111827;
+      margin:0 0 16px 0;
+      font-weight:700;
+    }
+    .bp-business-grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:24px;
+    }
+
+    .bp-card{
+      background:#fff;
+      border:1px solid #F3F4F6;
+      border-radius:8px;
+      transition: box-shadow .3s ease;
+      overflow:hidden;
+    }
+    .bp-card:hover{ box-shadow: 0 16px 30px rgba(17,24,39,.08); }
+    .bp-card-h{
+      padding:16px 16px 12px 16px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .bp-card-title{ font-size:20px; color:#111827; margin:0 0 6px 0; font-weight:700; }
+    .bp-badge{
+      display:inline-block;
+      border:1px solid #E5E7EB;
+      border-radius:999px;
+      padding:2px 10px;
+      font-size:12px;
+      color:#4B5563;
+      background:#fff;
+    }
+    .bp-mini{ width:80px; height:48px; flex:0 0 auto; }
+
+    .bp-card-c{ padding:0 16px 16px 16px; }
+    .bp-space{ height:16px; }
+
+    .bp-kpi{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding-bottom:12px;
+      border-bottom:1px solid #F3F4F6;
+      margin-bottom:12px;
+      gap:12px;
+    }
+    .bp-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+    .bp-mic{
+      padding:8px;
+      background:#F9FAFB;
+      border-radius:8px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .bp-klabel{ font-size:14px; color:#6B7280; }
+    .bp-kvalue{ font-size:18px; color:#111827; font-weight:700; }
+
+    .bp-row2{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; }
+    .bp-slabel{ font-size:14px; color:#6B7280; }
+    .bp-svalue{ font-size:14px; color:#111827; font-weight:700; }
+    .bp-pos{ color:#10B981; }
+    .bp-neg{ color:#EF4444; }
+    .bp-purple{ color:#9333EA; }
+    .bp-muted{ color:#4B5563; }
+
+    .bp-split{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      padding-top:12px;
+      margin-top:12px;
+      border-top:1px solid #F3F4F6;
+    }
+    .bp-col .bp-label{ margin:0; }
+    .bp-actions{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+    }
+    .bp-btn{
+      flex:1;
+      border-radius:8px;
+      padding:10px 12px;
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      border:1px solid #E5E7EB;
+      background:#fff;
+      color:#111827;
+      box-shadow:none;
+    }
+    .bp-btn:hover{ background:#F9FAFB; }
+    .bp-btn-danger{ border-color:#FECACA; color:#EF4444; }
+    .bp-btn-danger:hover{ background:#FEF2F2; }
+
+    @media (max-width: 1024px){
+      .bp-summary-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .bp-business-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 700px){
+      .bp-container{ padding:0 12px; }
+      .bp-summary-grid{ grid-template-columns: 1fr; }
+      .bp-business-grid{ grid-template-columns: 1fr; }
+      .bp-total{ text-align:left; }
+
+    /* ===== Asset Portfolio Dashboard (Assets redesign) ===== */
+    .ap-page{
+      width:100%;
+      background:#F9FAFB;
+      border:1px solid rgba(0,0,0,.06);
+      border-radius:12px;
+      overflow:hidden;
+    }
+    .ap-container{ max-width:1280px; margin:0 auto; padding:0 24px; }
+    .ap-header{ background:#FFFFFF; border-bottom:1px solid #E5E7EB; padding:24px 0; }
+    .ap-header-inner{ display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .ap-title{ font-size:30px; line-height:1.15; color:#111827; margin:0 0 4px; font-weight:700; letter-spacing:.2px; }
+    .ap-subtitle{ font-size:14px; color:#6B7280; margin:0; }
+    .ap-total{ text-align:right; }
+    .ap-total-label{ font-size:14px; color:#6B7280; margin-bottom:4px; }
+    .ap-total-value{ font-size:30px; color:#111827; font-weight:700; }
+
+    .ap-main{ padding:32px 0; }
+    .ap-summary-grid{ display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:32px; }
+    @media (min-width: 768px){ .ap-summary-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media (min-width: 1024px){ .ap-summary-grid{ grid-template-columns:repeat(4,1fr); } }
+    .ap-summary-card{ background:#FFFFFF; border:1px solid #F3F4F6; border-radius:8px; }
+    .ap-summary-card .ap-summary-content{ padding:24px 18px 18px; }
+    .ap-row{ display:flex; align-items:center; gap:12px; }
+    .ap-ic{
+      width:44px; height:44px;
+      display:inline-flex; align-items:center; justify-content:center;
+      border-radius:12px;
+      flex:0 0 auto;
+    }
+    .ap-label{ font-size:12px; color:#6B7280; margin-bottom:4px; }
+    .ap-value{ font-size:18px; color:#111827; font-weight:600; }
+    .ap-neg{ color:#EF4444; }
+
+    .ap-section-title{ font-size:20px; color:#111827; font-weight:700; margin:0 0 16px; }
+    .ap-add-card{ background:#FFFFFF; border:1px solid #F3F4F6; border-radius:8px; padding:18px; margin-bottom:24px; }
+    .ap-add-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+    @media (min-width: 768px){ .ap-add-grid{ grid-template-columns:repeat(3, 1fr); } }
+    .ap-input{
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #E5E7EB;
+      background:#FFFFFF;
+      box-shadow:none;
+      margin:0;
+      color:#111827;
+      font-size:14px;
+    }
+    .ap-input:focus{ outline:none; border-color:#CBD5E1; }
+    .ap-help{ font-size:12px; color:#6B7280; margin-top:8px; }
+    .ap-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 14px;
+      border-radius:8px;
+      border:1px solid #E5E7EB;
+      background:#FFFFFF;
+      color:#111827;
+      font-size:14px;
+      font-weight:600;
+      box-shadow:none;
+      margin:0;
+    }
+    .ap-btn:hover{ background:#F9FAFB; transform:none; }
+    .ap-btn-danger{ border-color:#FCA5A5; color:#B91C1C; background:#FFFFFF; }
+    .ap-btn-danger:hover{ background:#FEF2F2; }
+
+    .ap-grid{ display:grid; grid-template-columns:1fr; gap:24px; }
+    @media (min-width: 768px){ .ap-grid{ grid-template-columns:repeat(2, 1fr); } }
+    @media (min-width: 1024px){ .ap-grid{ grid-template-columns:repeat(3, 1fr); } }
+    .ap-card{ background:#FFFFFF; border:1px solid #F3F4F6; border-radius:8px; transition: box-shadow 300ms ease; overflow:hidden; }
+    .ap-card:hover{ box-shadow: 0 16px 40px rgba(17,24,39,.10); }
+    .ap-card-h{ padding:16px 16px 12px; border-bottom:1px solid transparent; }
+    .ap-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .ap-card-title{ font-size:20px; color:#111827; margin:0 0 8px; font-weight:700; }
+    .ap-meta{ display:flex; align-items:center; gap:6px; color:#6B7280; font-size:12px; }
+    .ap-badge{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #E5E7EB;
+      font-size:12px;
+      white-space:nowrap;
+      user-select:none;
+    }
+    .ap-badge--excellent{ background:#F0FDF4; color:#15803D; border-color:#BBF7D0; }
+    .ap-badge--good{ background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE; }
+    .ap-badge--fair{ background:#FFF7ED; color:#C2410C; border-color:#FED7AA; }
+
+    .ap-card-c{ padding:14px 16px 16px; }
+    .ap-row2{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .ap-k{ font-size:14px; color:#6B7280; }
+    .ap-v-lg{ font-size:18px; color:#111827; font-weight:600; }
+    .ap-v-sm{ font-size:14px; color:#111827; font-weight:500; }
+    .ap-border-b{ padding-bottom:12px; border-bottom:1px solid #E5E7EB; margin-bottom:12px; }
+    .ap-dep-left{ display:flex; align-items:center; gap:6px; }
+    .ap-dep{ font-size:14px; color:#EF4444; font-weight:600; }
+    .ap-date{ display:flex; align-items:center; gap:8px; padding-top:10px; border-top:1px solid #E5E7EB; margin-top:12px; color:#6B7280; font-size:12px; }
+    .ap-card-actions{ margin-top:12px; display:flex; justify-content:flex-end; }
+
+    @media (max-width: 700px){
+      .ap-container{ padding:0 14px; }
+      .ap-title{ font-size:22px; }
+      .ap-total-value{ font-size:22px; }
+    }
+      .bp-actions{ flex-direction:column; }
+    }
+
     .mobile-bar{ display:none; }
     .nav-links{ display:block; }
 
@@ -542,84 +843,7 @@
   const title = document.getElementById("title");
   const content = document.getElementById("content");
 
-  /* ===== DASHBOARD ===== */
-  async function showDashboard(){
-    title.innerText = "Company Dashboard";
-    content.innerHTML = `
-      <div class="container">
-        <div class="card">Dashboard Loaded Successfully</div>
-      </div>
-    `;
-  }
-
-  /* ===== BASIC SCREENS ===== */
-  function showAddEmployee(){
-    title.innerText="Add Employee";
-    content.innerHTML=`<div class="card">Add Employee Screen</div>`;
-  }
-  function showBusinesses(){
-      title.innerText = "Businesses";
-      content.innerHTML = `<div class="container"><div class="card">Loading businesses...</div></div>`;
-      sb.from("businesses").select("id,name,type,value").then(async ({ data, error }) => {
-        if (error || !data) {
-          content.innerHTML = `<div class='container'><div class='card'>Failed to load businesses</div></div>`;
-          return;
-        }
-        // Fetch reports for all businesses for mini-graphs
-        const ids = data.map(b => b.id);
-        let reportsMap = {};
-        if(ids.length) {
-          const { data: reports } = await sb.from("reports").select("business_id,month,profit").in("business_id", ids);
-          if(reports) {
-            reports.forEach(r => {
-              if(!reportsMap[r.business_id]) reportsMap[r.business_id] = [];
-              reportsMap[r.business_id].push(r);
-            });
-          }
-        }
-        let html = `<div class='container'><div class='card' style="background:linear-gradient(120deg,#e0e7ff 0%,#f0fdf4 100%);box-shadow:0 8px 32px #a5b4fc33;"><h2 style="font-size:1.6rem;font-weight:700;margin-bottom:14px;letter-spacing:0.6px;color:#222;text-shadow:0 2px 8px #fff3;">Businesses</h2><div id='bizList' class='biz-grid'>`;
-        data.forEach(b => {
-          // Prepare mini-graph data
-          let graph = '';
-          const rep = reportsMap[b.id] || [];
-          if(rep.length > 1) {
-            const profits = rep.sort((a,b)=>a.month.localeCompare(b.month)).map(r=>r.profit);
-            const max = Math.max(...profits,1), min = Math.min(...profits,0);
-            graph = `<svg width="100" height="32" style="margin:8px 0 0 0;display:block;"><polyline fill="none" stroke="#3b82f6" stroke-width="3" points="${profits.map((p,i)=>`${i*20},${28-24*((p-min)/(max-min||1))}`).join(' ')}"/><circle r="3" fill="#22c55e" cx="${(profits.length-1)*20}" cy="${28-24*((profits[profits.length-1]-min)/(max-min||1))}"/></svg>`;
-          } else {
-            graph = `<div style='height:32px'></div>`;
-          }
-          html += `<div class='card' style='min-width:0;max-width:100%;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;padding:16px;'>
-            <div style='font-size:1.1rem;font-weight:700;color:#222;margin-bottom:2px;'>${b.name}</div>
-            <div style='color:#555;font-size:.95rem;margin-bottom:6px;'>Type: <b>${b.type || '-'}</b></div>
-            <div style='color:#2563eb;font-size:1rem;margin-bottom:4px;'>Value: ₹${b.value || 0}</div>
-            <div style='margin-bottom:8px;'>${graph}</div>
-            <div class='biz-actions'>
-              <button style='background:linear-gradient(90deg,#2563eb,#22c55e);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="window.openBusinessDashboard && window.openBusinessDashboard('${b.id}','${b.name}')">Open</button>
-              <button style='background:linear-gradient(90deg,#ef4444,#f59e42);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="deleteBusiness('${b.id}','${b.name}')">Delete</button>
-            </div>
-          </div>`;
-        });
-        html += `</div></div></div>`;
-        content.innerHTML = html;
-      });
-  }
-  function showEmployees(){
-    title.innerText="Employees";
-    content.innerHTML=`<div class="card">Employees Screen</div>`;
-  }
-  function showMoneyPool(){
-    title.innerText="Money Pool";
-    content.innerHTML=`<div class="card">Money Pool Screen</div>`;
-  }
-  function showAddBusiness(){
-    title.innerText="Add Business";
-    content.innerHTML=`<div class="card">Add Business Screen</div>`;
-  }
-  function showAssets(){
-    title.innerText="Assets";
-    content.innerHTML=`<div class="card">Assets Screen</div>`;
-  }
+  // Screen rendering functions are provided by js/app.js
 
   /* ===== LOGOUT ===== */
   document.getElementById("logoutBtn").addEventListener("click", async () => {

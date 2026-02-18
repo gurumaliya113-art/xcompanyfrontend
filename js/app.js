@@ -1328,82 +1328,308 @@ async function saveEmployee(){
 
 
 async function showBusinesses(){
-  title.innerText = "Businesses";
+  title.innerText = "Portfolio";
+  content.innerHTML = `<div class='container'><div class='card'>Loading portfolio...</div></div>`;
 
-  // 1️⃣ sab businesses
-  const { data: businesses, error } = await sb
-    .from("businesses")
-    .select("id,name,type");
-
-  if(error){
-    content.innerHTML = "<div class='card'>Failed to load businesses</div>";
-    return;
+  function inr(n){
+    const num = Number(n || 0);
+    try { return `₹${num.toLocaleString('en-IN')}`; }
+    catch(e){ return `₹${num}`; }
   }
 
-  // 2️⃣ sab reports (profit)
-  const { data: reports } = await sb
-    .from("reports")
-    .select("business_id, profit");
+  function businessValuation(b){
+    const raw = (
+      (b && (b.value ?? b.valuation ?? b.business_value ?? b.current_value ?? b.amount ?? b.total_value ?? b.valuation_amount))
+    );
+    const num = Number(raw ?? 0);
+    return Number.isFinite(num) ? num : 0;
+  }
 
-  // 3️⃣ profit map
-  const profitMap = {};
-  reports.forEach(r=>{
-    if(!profitMap[r.business_id]){
-      profitMap[r.business_id] = 0;
+  function iconSvg(kind){
+    // lightweight inline SVG icons (lucide-like), no external deps
+    const common = `width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+    switch(kind){
+      case 'dollar':
+        return `<svg ${common}><path d="M12 2v20"/><path d="M17 6H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7"/></svg>`;
+      case 'wallet':
+        return `<svg ${common}><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2"/><path d="M21 8H8a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h13"/><path d="M16 12h.01"/></svg>`;
+      case 'briefcase':
+        return `<svg ${common}><path d="M10 2h4a2 2 0 0 1 2 2v2H8V4a2 2 0 0 1 2-2z"/><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 12h18"/></svg>`;
+      case 'pie':
+        return `<svg ${common}><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>`;
+      case 'trendUp':
+        return `<svg ${common}><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>`;
+      case 'trendDown':
+        return `<svg ${common}><path d="M3 7l6 6 4-4 7 7"/><path d="M14 16h6v-6"/></svg>`;
+      case 'bars':
+        return `<svg ${common}><path d="M3 3v18h18"/><path d="M7 16v-6"/><path d="M11 16v-9"/><path d="M15 16v-4"/><path d="M19 16v-11"/></svg>`;
+      case 'pig':
+        return `<svg ${common}><path d="M5 11c0-3 2.5-5 6-5s6 2 6 5v4a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-4z"/><path d="M17 10h2v4h-2"/><path d="M7 9h.01"/><path d="M12 6V4"/></svg>`;
+      default:
+        return `<svg ${common}><circle cx="12" cy="12" r="9"/></svg>`;
     }
-    profitMap[r.business_id] += Number(r.profit || 0);
+  }
+
+  function miniLineSvg(values, stroke){
+    const w = 80, h = 48;
+    const pts = (values || []).slice(-7);
+    if(pts.length < 2){
+      return `<svg class="bp-mini" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    }
+    const min = Math.min.apply(null, pts);
+    const max = Math.max.apply(null, pts);
+    const span = (max - min) || 1;
+    const step = (w - 2) / (pts.length - 1);
+    const points = pts.map((v, i) => {
+      const x = 1 + i * step;
+      const y = (h - 4) - ((Number(v) - min) / span) * (h - 8);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+    return `
+      <svg class="bp-mini" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+        <polyline fill="none" stroke="${stroke}" stroke-width="2" points="${points}" />
+      </svg>
+    `;
+  }
+
+  // Businesses
+  let businesses = null;
+  {
+    // Use '*' so we don't reference a column that may not exist (e.g. 'value')
+    const res = await sb.from("businesses").select("*");
+    if(res.error){
+      content.innerHTML = `<div class='container'><div class='card'>Failed to load businesses<br><div style='opacity:.8;margin-top:8px'>${res.error.message || ''}</div></div></div>`;
+      return;
+    }
+    businesses = res.data || [];
+  }
+
+  // Reports (used for portfolio metrics + mini trends)
+  let reports = [];
+  {
+    const rep = await sb
+      .from("reports")
+      .select("business_id, month, profit, income, expense, created_at");
+    if(!rep.error && rep.data) reports = rep.data;
+  }
+
+  // Aggregate per-business stats
+  const agg = {}; // id -> { income, expense, profitNet, profitPos, lossAbs, profitsSeries[] }
+  for(const r of (reports || [])){
+    const id = r.business_id;
+    if(!id) continue;
+    if(!agg[id]){
+      agg[id] = { income:0, expense:0, profitNet:0, profitPos:0, lossAbs:0, series:[] };
+    }
+    const income = Number(r.income || 0);
+    const expense = Number(r.expense || 0);
+    const p = (r.profit !== null && r.profit !== undefined)
+      ? Number(r.profit || 0)
+      : (income - expense);
+
+    agg[id].income += income;
+    agg[id].expense += expense;
+    agg[id].profitNet += p;
+    if(p >= 0) agg[id].profitPos += p;
+    else agg[id].lossAbs += Math.abs(p);
+    agg[id].series.push({
+      key: r.month || (r.created_at ? String(r.created_at).slice(0,10) : ""),
+      value: p
+    });
+  }
+
+  // Portfolio totals
+  let totalValuation = 0;
+  let totalInvested = 0; // defined as total expense across reports
+  let totalIncome = 0;
+  let totalNet = 0;
+  businesses.forEach(b => {
+    totalValuation += businessValuation(b);
+    const a = agg[b.id] || { income:0, expense:0, profitNet:0 };
+    totalInvested += Number(a.expense || 0);
+    totalIncome += Number(a.income || 0);
+    totalNet += Number(a.profitNet || 0);
   });
+  const totalVariance = totalValuation - totalInvested;
 
-  // 4️⃣ best & worst nikaalo
-  let bestId = null;
-  let worstId = null;
-  let maxProfit = -Infinity;
-  let minProfit = Infinity;
+  const varianceClass = totalVariance >= 0 ? 'bp-pos' : 'bp-neg';
+  const netClass = totalNet >= 0 ? 'bp-pos' : 'bp-neg';
 
-  businesses.forEach(b=>{
-    const p = profitMap[b.id] ?? 0;
+  // UI
+  let html = `
+    <div class="bp-page">
+      <header class="bp-header">
+        <div class="bp-container bp-header-inner">
+          <div>
+            <div class="bp-title">Portfolio Dashboard</div>
+            <div class="bp-subtitle">Business Performance Overview</div>
+          </div>
+          <div class="bp-total">
+            <div class="bp-total-label">Total Portfolio Value</div>
+            <div class="bp-total-value">${inr(totalValuation)}</div>
+          </div>
+        </div>
+      </header>
 
-    if(p > maxProfit){
-      maxProfit = p;
-      bestId = b.id;
-    }
-    if(p < minProfit){
-      minProfit = p;
-      worstId = b.id;
-    }
-  });
+      <main class="bp-main">
+        <div class="bp-container">
+          <div class="bp-summary-grid">
+            <div class="bp-summary-card">
+              <div class="bp-row">
+                <div class="bp-ic" style="background:#EFF6FF;color:#2563EB">${iconSvg('dollar')}</div>
+                <div>
+                  <div class="bp-label">Total Invested</div>
+                  <div class="bp-value">${inr(totalInvested)}</div>
+                </div>
+              </div>
+            </div>
+            <div class="bp-summary-card">
+              <div class="bp-row">
+                <div class="bp-ic" style="background:#F5F3FF;color:#9333EA">${iconSvg('pie')}</div>
+                <div>
+                  <div class="bp-label">Variance</div>
+                  <div class="bp-value ${varianceClass}">${totalVariance >= 0 ? '+' : ''}${inr(totalVariance).replace('₹','₹')}</div>
+                </div>
+              </div>
+            </div>
+            <div class="bp-summary-card">
+              <div class="bp-row">
+                <div class="bp-ic" style="background:#ECFDF5;color:#10B981">${iconSvg('trendUp')}</div>
+                <div>
+                  <div class="bp-label">Net Profit</div>
+                  <div class="bp-value ${netClass}">${inr(totalNet)}</div>
+                </div>
+              </div>
+            </div>
+            <div class="bp-summary-card">
+              <div class="bp-row">
+                <div class="bp-ic" style="background:#FFF7ED;color:#EA580C">${iconSvg('wallet')}</div>
+                <div>
+                  <div class="bp-label">Cash (Revenue)</div>
+                  <div class="bp-value">${inr(totalIncome)}</div>
+                </div>
+              </div>
+            </div>
+            <div class="bp-summary-card">
+              <div class="bp-row">
+                <div class="bp-ic" style="background:#F3F4F6;color:#4B5563">${iconSvg('briefcase')}</div>
+                <div>
+                  <div class="bp-label">Businesses</div>
+                  <div class="bp-value">${(businesses || []).length}</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-  // 5️⃣ UI
-  let html = `<div class="container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">`;
+          <div class="bp-section-title">Business Ventures</div>
+          <div class="bp-business-grid">
+  `;
 
-  businesses.forEach(b=>{
-    const profit = profitMap[b.id] ?? 0;
+  (businesses || []).forEach(b => {
+    const a = agg[b.id] || { income:0, expense:0, profitNet:0, profitPos:0, lossAbs:0, series:[] };
+    const valuation = businessValuation(b);
+    const invested = Number(a.expense || 0);
+    const variance = valuation - invested;
+    const variancePct = invested > 0 ? ((variance / invested) * 100) : 0;
+    const net = Number(a.profitNet || 0);
+    const profit = Number(a.profitPos || 0);
+    const loss = Number(a.lossAbs || 0);
+    const cash = Number(a.income || 0);
+    const isPos = variance >= 0;
+    const vClass = isPos ? 'bp-pos' : 'bp-neg';
+    const netClass2 = net >= 0 ? 'bp-pos' : 'bp-neg';
 
-    let badge = "";
-    if(b.id === bestId){
-      badge = `<div style="color:#22c55e;font-weight:600;margin-bottom:8px">🏆 Best Performing</div>`;
-    }
-    if(b.id === worstId){
-      badge = `<div style="color:#ef4444;font-weight:600;margin-bottom:8px">⚠️ Least Performing</div>`;
-    }
+    // series: sort by key (month), then take values
+    const seriesVals = (a.series || [])
+      .slice()
+      .sort((x,y) => String(x.key).localeCompare(String(y.key)))
+      .map(s => Number(s.value || 0));
+    const stroke = net >= 0 ? '#10B981' : '#EF4444';
 
     html += `
-      <div class="card">
-        ${badge}
-        <b>${b.name}</b><br>
-        Type: ${b.type}<br>
-        Total Profit: ₹${profit.toLocaleString()}<br><br>
+      <div class="bp-card">
+        <div class="bp-card-h">
+          <div style="min-width:0">
+            <div class="bp-card-title">${String(b.name || '-')}</div>
+            <span class="bp-badge">${String(b.type || 'Business')}</span>
+          </div>
+          ${miniLineSvg(seriesVals, stroke)}
+        </div>
 
-        <button onclick="openBusiness('${b.id}','${b.name}')">Open</button>
-        <button style="background:#ef4444;margin-left:10px"
-          onclick="deleteBusiness('${b.id}')">
-          Delete
-        </button>
+        <div class="bp-card-c">
+          <div class="bp-kpi">
+            <div class="bp-left">
+              <span class="bp-mic" style="color:#4B5563">${iconSvg('bars').replace('width="20"','width="16"').replace('height="20"','height="16"')}</span>
+              <span class="bp-klabel">Valuation</span>
+            </div>
+            <div class="bp-kvalue">${inr(valuation)}</div>
+          </div>
+
+          <div class="bp-row2">
+            <div class="bp-left">
+              <span class="bp-mic" style="color:#4B5563">${iconSvg('pig').replace('width="20"','width="16"').replace('height="20"','height="16"')}</span>
+              <span class="bp-slabel">Invested</span>
+            </div>
+            <div class="bp-svalue">${inr(invested)}</div>
+          </div>
+
+          <div class="bp-row2">
+            <div class="bp-left">
+              <span style="display:inline-flex;align-items:center;justify-content:center;color:${isPos ? '#10B981' : '#EF4444'}">
+                ${iconSvg(isPos ? 'trendUp' : 'trendDown').replace('width="20"','width="16"').replace('height="20"','height="16"')}
+              </span>
+              <span class="bp-slabel">Variance</span>
+            </div>
+            <div class="bp-svalue ${vClass}">${variance >= 0 ? '+' : ''}${inr(variance)} (${variancePct.toFixed(1)}%)</div>
+          </div>
+
+          <div class="bp-split">
+            <div class="bp-col">
+              <div class="bp-left" style="gap:6px">
+                <span style="color:#10B981;display:inline-flex">${iconSvg('trendUp').replace('width="20"','width="14"').replace('height="20"','height="14"')}</span>
+                <span class="bp-label" style="margin:0">Profit</span>
+              </div>
+              <div class="bp-svalue bp-pos">${inr(profit)}</div>
+            </div>
+            <div class="bp-col">
+              <div class="bp-left" style="gap:6px">
+                <span style="color:#EF4444;display:inline-flex">${iconSvg('trendDown').replace('width="20"','width="14"').replace('height="20"','height="14"')}</span>
+                <span class="bp-label" style="margin:0">Loss</span>
+              </div>
+              <div class="bp-svalue bp-neg">${inr(loss)}</div>
+            </div>
+          </div>
+
+          <div class="bp-split" style="border-top:none;padding-top:8px;margin-top:8px;">
+            <div class="bp-col">
+              <div class="bp-label" style="margin:0">Net P&L</div>
+              <div class="bp-svalue ${netClass2}">${inr(net)}</div>
+            </div>
+            <div class="bp-col">
+              <div class="bp-left" style="gap:6px">
+                <span style="color:#4B5563;display:inline-flex">${iconSvg('wallet').replace('width="20"','width="14"').replace('height="20"','height="14"')}</span>
+                <span class="bp-label" style="margin:0">Cash</span>
+              </div>
+              <div class="bp-svalue">${inr(cash)}</div>
+            </div>
+          </div>
+
+          <div class="bp-actions">
+            <button class="bp-btn" onclick="openBusiness('${b.id}','${String(b.name || '').replace(/"/g,'&quot;')}')">Open</button>
+            <button class="bp-btn bp-btn-danger" onclick="deleteBusiness('${b.id}','${String(b.name || '').replace(/"/g,'&quot;')}')">Delete</button>
+          </div>
+        </div>
       </div>
     `;
   });
 
-  html += `</div>`;
+  html += `
+          </div>
+        </div>
+      </main>
+    </div>
+  `;
+
   content.innerHTML = html;
 }
 
@@ -3250,6 +3476,72 @@ async function saveWork(){
 async function showAssets(){
   title.innerText = "Company Assets";
 
+  // Ensure Asset Portfolio styles exist (keeps UI correct even if host HTML wasn't updated)
+  (function ensureAssetPortfolioStyles(){
+    if(document.getElementById('ap-styles')) return;
+    const css = `
+      .ap-page{width:100%;background:#F9FAFB;border:1px solid rgba(0,0,0,.06);border-radius:12px;overflow:hidden}
+      .ap-container{max-width:1280px;margin:0 auto;padding:0 24px}
+      .ap-header{background:#FFFFFF;border-bottom:1px solid #E5E7EB;padding:24px 0}
+      .ap-header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px}
+      .ap-title{font-size:30px;line-height:1.15;color:#111827;margin:0 0 4px;font-weight:700;letter-spacing:.2px}
+      .ap-subtitle{font-size:14px;color:#6B7280;margin:0}
+      .ap-total{text-align:right}
+      .ap-total-label{font-size:14px;color:#6B7280;margin-bottom:4px}
+      .ap-total-value{font-size:30px;color:#111827;font-weight:700}
+      .ap-main{padding:32px 0}
+      .ap-summary-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:32px}
+      @media (min-width:768px){.ap-summary-grid{grid-template-columns:repeat(2,1fr)}}
+      @media (min-width:1024px){.ap-summary-grid{grid-template-columns:repeat(4,1fr)}}
+      .ap-summary-card{background:#FFFFFF;border:1px solid #F3F4F6;border-radius:8px}
+      .ap-summary-card .ap-summary-content{padding:24px 18px 18px}
+      .ap-row{display:flex;align-items:center;gap:12px}
+      .ap-ic{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;flex:0 0 auto}
+      .ap-label{font-size:12px;color:#6B7280;margin-bottom:4px}
+      .ap-value{font-size:18px;color:#111827;font-weight:600}
+      .ap-neg{color:#EF4444}
+      .ap-section-title{font-size:20px;color:#111827;font-weight:700;margin:0 0 16px}
+      .ap-add-card{background:#FFFFFF;border:1px solid #F3F4F6;border-radius:8px;padding:18px;margin-bottom:24px}
+      .ap-add-grid{display:grid;grid-template-columns:1fr;gap:12px}
+      @media (min-width:768px){.ap-add-grid{grid-template-columns:repeat(3,1fr)}}
+      .ap-input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #E5E7EB;background:#FFFFFF;box-shadow:none;margin:0;color:#111827;font-size:14px}
+      .ap-input:focus{outline:none;border-color:#CBD5E1}
+      .ap-help{font-size:12px;color:#6B7280;margin-top:8px}
+      .ap-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:8px;border:1px solid #E5E7EB;background:#FFFFFF;color:#111827;font-size:14px;font-weight:600;box-shadow:none;margin:0}
+      .ap-btn:hover{background:#F9FAFB;transform:none}
+      .ap-btn-danger{border-color:#FCA5A5;color:#B91C1C;background:#FFFFFF}
+      .ap-btn-danger:hover{background:#FEF2F2}
+      .ap-grid{display:grid;grid-template-columns:1fr;gap:24px}
+      @media (min-width:768px){.ap-grid{grid-template-columns:repeat(2,1fr)}}
+      @media (min-width:1024px){.ap-grid{grid-template-columns:repeat(3,1fr)}}
+      .ap-card{background:#FFFFFF;border:1px solid #F3F4F6;border-radius:8px;transition:box-shadow 300ms ease;overflow:hidden}
+      .ap-card:hover{box-shadow:0 16px 40px rgba(17,24,39,.10)}
+      .ap-card-h{padding:16px 16px 12px}
+      .ap-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+      .ap-card-title{font-size:20px;color:#111827;margin:0 0 8px;font-weight:700}
+      .ap-meta{display:flex;align-items:center;gap:6px;color:#6B7280;font-size:12px}
+      .ap-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;border:1px solid #E5E7EB;font-size:12px;white-space:nowrap;user-select:none}
+      .ap-badge--excellent{background:#F0FDF4;color:#15803D;border-color:#BBF7D0}
+      .ap-badge--good{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
+      .ap-badge--fair{background:#FFF7ED;color:#C2410C;border-color:#FED7AA}
+      .ap-card-c{padding:14px 16px 16px}
+      .ap-row2{display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .ap-k{font-size:14px;color:#6B7280}
+      .ap-v-lg{font-size:18px;color:#111827;font-weight:600}
+      .ap-v-sm{font-size:14px;color:#111827;font-weight:500}
+      .ap-border-b{padding-bottom:12px;border-bottom:1px solid #E5E7EB;margin-bottom:12px}
+      .ap-dep-left{display:flex;align-items:center;gap:6px}
+      .ap-dep{font-size:14px;color:#EF4444;font-weight:600}
+      .ap-date{display:flex;align-items:center;gap:8px;padding-top:10px;border-top:1px solid #E5E7EB;margin-top:12px;color:#6B7280;font-size:12px}
+      .ap-card-actions{margin-top:12px;display:flex;justify-content:flex-end}
+      @media (max-width:700px){.ap-container{padding:0 14px}.ap-title{font-size:22px}.ap-total-value{font-size:22px}}
+    `;
+    const style = document.createElement('style');
+    style.id = 'ap-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
+  })();
+
   const { data, error } = await sb
     .from("company_assets")
     .select("*")
@@ -3280,64 +3572,360 @@ async function showAssets(){
     return sum + (Number.isFinite(v) ? v : 0);
   }, 0);
 
-  let html = `
-    <div class="container">
-      <div class="card">
-        <h3 style="margin-top:0;">Add Asset</h3>
-        <input id="asset_name" placeholder="Asset name (Truck / Stock)">
-        <input id="asset_value" type="number" placeholder="Value (₹)">
-        <button onclick="addAsset()">Add Asset</button>
-        <div style="margin-top:10px;opacity:.8;font-size:14px">Tip: Use positive value only.</div>
-      </div>
+  function inr(n){
+    const num = Number(n ?? 0);
+    try { return `₹${num.toLocaleString('en-IN')}`; }
+    catch(e){ return `₹${num}`; }
+  }
 
-      <div class="card">
-        <b>Total Asset Value:</b> ₹${total}
-      </div>
+  function iconSvg(kind){
+    const common = `width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+    switch(kind){
+      case 'dollar':
+        return `<svg ${common}><path d="M12 2v20"/><path d="M17 6H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7"/></svg>`;
+      case 'trendDown':
+        return `<svg ${common}><path d="M3 7l6 6 4-4 7 7"/><path d="M14 16h6v-6"/></svg>`;
+      case 'package':
+        return `<svg ${common}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+      case 'layers':
+        return `<svg ${common}><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`;
+      case 'calendar':
+        return `<svg ${common}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>`;
+      case 'miniPackage':
+        return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`;
+      default:
+        return `<svg ${common}><circle cx="12" cy="12" r="9"/></svg>`;
+    }
+  }
+
+  function fmtMonthYear(dateStr){
+    if(!dateStr) return null;
+    const d = new Date(dateStr);
+    if(Number.isNaN(d.getTime())) return null;
+    try{
+      return new Intl.DateTimeFormat('en-IN', { month:'short', year:'numeric' }).format(d);
+    }catch(e){
+      return String(dateStr);
+    }
+  }
+
+  function normalizeCondition(v){
+    const s = String(v || '').trim().toLowerCase();
+    if(s === 'excellent') return 'Excellent';
+    if(s === 'fair') return 'Fair';
+    return 'Good';
+  }
+
+  function conditionBadgeClass(c){
+    if(c === 'Excellent') return 'ap-badge ap-badge--excellent';
+    if(c === 'Fair') return 'ap-badge ap-badge--fair';
+    return 'ap-badge ap-badge--good';
+  }
+
+  // Inline edit state
+  const editId = window.__ap_edit_asset_id || null;
+
+  window.openAssetEdit = function(assetId){
+    window.__ap_edit_asset_id = assetId;
+    showAssets();
+  };
+
+  window.cancelAssetEdit = function(){
+    window.__ap_edit_asset_id = null;
+    showAssets();
+  };
+
+  window.saveAssetEdit = async function(assetId){
+    const root = document.querySelector(`[data-asset-edit="${assetId}"]`);
+    if(!root){
+      alert('Edit form missing');
+      return;
+    }
+
+    const name = (root.querySelector('[data-f="name"]')?.value || '').trim();
+    const category = (root.querySelector('[data-f="category"]')?.value || '').trim();
+    const condition = (root.querySelector('[data-f="condition"]')?.value || 'Good').trim();
+    const purchaseDate = (root.querySelector('[data-f="purchase_date"]')?.value || '').trim();
+    const purchaseValue = Number(root.querySelector('[data-f="purchase_value"]')?.value || 0);
+    const currentValue = Number(root.querySelector('[data-f="current_value"]')?.value || 0);
+
+    if(!name || !purchaseDate || !(purchaseValue > 0) || !(currentValue >= 0)){
+      alert('Name, purchase date, purchase value aur today value sahi bhar');
+      return;
+    }
+
+    const { error: upErr } = await sb
+      .from('company_assets')
+      .update({
+        name,
+        category: category || 'General',
+        condition: condition || 'Good',
+        purchase_date: purchaseDate,
+        purchase_value: purchaseValue,
+        current_value: currentValue
+      })
+      .eq('id', assetId);
+
+    if(upErr){
+      console.error(upErr);
+      alert('Update failed: ' + (upErr.message || ''));
+      return;
+    }
+
+    window.__ap_edit_asset_id = null;
+    showAssets();
+  };
+
+  // Portfolio metrics
+  const totalPurchaseValue = rows.reduce((sum, a) => {
+    const pv = Number(a.purchase_value ?? a.purchaseValue ?? 0);
+    return sum + (Number.isFinite(pv) ? pv : 0);
+  }, 0);
+  const totalCurrentValue = total;
+  const totalDepreciation = totalPurchaseValue - totalCurrentValue;
+  const avgDepPct = totalPurchaseValue > 0 ? (totalDepreciation / totalPurchaseValue) * 100 : 0;
+  const categoryCount = new Set(rows.map(r => String(r.category || 'General').trim()).filter(Boolean)).size;
+
+  let html = `
+    <div class="ap-page">
+      <header class="ap-header">
+        <div class="ap-container ap-header-inner">
+          <div>
+            <div class="ap-title">Asset Portfolio</div>
+            <div class="ap-subtitle">Company Asset Management</div>
+          </div>
+          <div class="ap-total">
+            <div class="ap-total-label">Total Asset Value</div>
+            <div class="ap-total-value">${inr(totalCurrentValue)}</div>
+          </div>
+        </div>
+      </header>
+
+      <main class="ap-main">
+        <div class="ap-container">
+          <div class="ap-summary-grid">
+            <div class="ap-summary-card">
+              <div class="ap-summary-content">
+                <div class="ap-row">
+                  <div class="ap-ic" style="background:#EFF6FF;color:#2563EB">${iconSvg('dollar')}</div>
+                  <div>
+                    <div class="ap-label">Purchase Value</div>
+                    <div class="ap-value">${inr(totalPurchaseValue)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ap-summary-card">
+              <div class="ap-summary-content">
+                <div class="ap-row">
+                  <div class="ap-ic" style="background:#FEF2F2;color:#EF4444">${iconSvg('trendDown')}</div>
+                  <div>
+                    <div class="ap-label">Depreciation</div>
+                    <div class="ap-value ap-neg">${inr(totalDepreciation)}</div>
+                    <div class="ap-label" style="margin:4px 0 0;">(${avgDepPct.toFixed(1)}%)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ap-summary-card">
+              <div class="ap-summary-content">
+                <div class="ap-row">
+                  <div class="ap-ic" style="background:#F5F3FF;color:#9333EA">${iconSvg('package')}</div>
+                  <div>
+                    <div class="ap-label">Total Assets</div>
+                    <div class="ap-value">${rows.length}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ap-summary-card">
+              <div class="ap-summary-content">
+                <div class="ap-row">
+                  <div class="ap-ic" style="background:#F0FDF4;color:#10B981">${iconSvg('layers')}</div>
+                  <div>
+                    <div class="ap-label">Categories</div>
+                    <div class="ap-value">${categoryCount}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ap-add-card">
+            <div class="ap-section-title" style="margin-bottom:12px;">Add Asset</div>
+            <div class="ap-add-grid">
+              <input id="asset_name" class="ap-input" placeholder="Asset name (Truck / Stock)">
+              <input id="asset_category" class="ap-input" placeholder="Category (Electronics - Mobile)">
+              <select id="asset_condition" class="ap-input">
+                <option value="Excellent">Excellent</option>
+                <option value="Good" selected>Good</option>
+                <option value="Fair">Fair</option>
+              </select>
+              <input id="asset_purchase_date" class="ap-input" type="date" placeholder="Purchase date">
+              <input id="asset_purchase_value" class="ap-input" type="number" step="0.01" placeholder="Purchase value (₹)">
+              <input id="asset_today_value" class="ap-input" type="number" step="0.01" placeholder="Today's value (₹)">
+            </div>
+            <div id="asset_dep_preview" class="ap-help"></div>
+            <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+              <button class="ap-btn" onclick="addAsset()">Add Asset</button>
+            </div>
+          </div>
+
+          <div class="ap-section-title">Asset Inventory</div>
+          <div class="ap-grid">
   `;
 
   if(rows.length === 0){
-    html += `<div class="card">No assets yet.</div>`;
+    html += `<div class="ap-add-card" style="margin:0;">No assets yet.</div>`;
   } else {
     rows.forEach(a => {
-      const v = Number(a.current_value ?? a.value ?? 0);
+      const name = a.name || "(Unnamed)";
+      const category = (a.category || 'General');
+      const cond = normalizeCondition(a.condition);
+
+      const pv = Number(a.purchase_value ?? a.purchaseValue ?? a.current_value ?? 0);
+      const cv = Number(a.current_value ?? a.currentValue ?? a.value ?? 0);
+
+      const depAmt = (a.depreciation_amount !== undefined && a.depreciation_amount !== null)
+        ? Number(a.depreciation_amount)
+        : (pv - cv);
+      const depPct = (a.depreciation_percent !== undefined && a.depreciation_percent !== null)
+        ? Number(a.depreciation_percent)
+        : (pv > 0 ? (depAmt / pv) * 100 : null);
+
+      const depText = `${inr(depAmt)}${Number.isFinite(depPct) ? ` (${depPct.toFixed(1)}%)` : ''}`;
+      const pDateRaw = a.purchase_date || (a.created_at ? String(a.created_at).slice(0,10) : null);
+      const monthYear = fmtMonthYear(pDateRaw);
+
+      const isEditing = editId && String(editId) === String(a.id);
+
       html += `
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div>
-              <div style="font-weight:800">${a.name || "(Unnamed)"}</div>
-              <div style="opacity:.85">Value: ₹${Number.isFinite(v) ? v : 0}</div>
+        <div class="ap-card">
+          <div class="ap-card-h">
+            <div class="ap-card-top">
+              <div style="min-width:0;flex:1;">
+                <div class="ap-card-title">${String(name)}</div>
+                <div class="ap-meta">
+                  <span style="color:#9CA3AF;display:inline-flex;">${iconSvg('miniPackage')}</span>
+                  <span>${String(category)}</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+                <span class="${conditionBadgeClass(cond)}">${cond}</span>
+              </div>
             </div>
-            <button style="background:#ef4444" onclick="deleteAsset('${a.id}')">Delete</button>
+          </div>
+
+          <div class="ap-card-c">
+            ${isEditing ? `
+              <div data-asset-edit="${a.id}">
+                <div class="ap-add-grid" style="margin-top:2px;">
+                  <input class="ap-input" data-f="name" value="${String(name).replace(/"/g,'&quot;')}" placeholder="Asset name">
+                  <input class="ap-input" data-f="category" value="${String(category).replace(/"/g,'&quot;')}" placeholder="Category">
+                  <select class="ap-input" data-f="condition">
+                    <option value="Excellent" ${cond==='Excellent'?'selected':''}>Excellent</option>
+                    <option value="Good" ${cond==='Good'?'selected':''}>Good</option>
+                    <option value="Fair" ${cond==='Fair'?'selected':''}>Fair</option>
+                  </select>
+                  <input class="ap-input" data-f="purchase_date" type="date" value="${(a.purchase_date || (a.created_at ? String(a.created_at).slice(0,10) : ''))}">
+                  <input class="ap-input" data-f="purchase_value" type="number" step="0.01" value="${Number.isFinite(pv) ? pv : 0}" placeholder="Purchase value (₹)">
+                  <input class="ap-input" data-f="current_value" type="number" step="0.01" value="${Number.isFinite(cv) ? cv : 0}" placeholder="Today's value (₹)">
+                </div>
+                <div class="ap-help" style="margin-top:10px;">Save will auto-recalculate depreciation.</div>
+                <div class="ap-card-actions" style="gap:10px;justify-content:flex-end;">
+                  <button class="ap-btn" onclick="saveAssetEdit('${a.id}')">Save</button>
+                  <button class="ap-btn" onclick="cancelAssetEdit()">Cancel</button>
+                </div>
+              </div>
+            ` : `
+              <div class="ap-row2 ap-border-b">
+                <span class="ap-k">Current Value</span>
+                <span class="ap-v-lg">${inr(cv)}</span>
+              </div>
+              <div class="ap-row2">
+                <span class="ap-k">Purchase Value</span>
+                <span class="ap-v-sm">${inr(pv)}</span>
+              </div>
+              <div class="ap-row2" style="margin-top:10px;">
+                <div class="ap-dep-left">
+                  <span style="color:#EF4444;display:inline-flex">${iconSvg('trendDown').replace('width="20"','width="16"').replace('height="20"','height="16"')}</span>
+                  <span class="ap-k">Depreciation</span>
+                </div>
+                <span class="ap-dep">${depText}</span>
+              </div>
+              <div class="ap-date">
+                <span style="color:#9CA3AF;display:inline-flex">${iconSvg('calendar').replace('width="20"','width="12"').replace('height="20"','height="12"')}</span>
+                <span>Purchased ${monthYear || '-'}</span>
+              </div>
+              <div class="ap-card-actions" style="gap:10px;">
+                <button class="ap-btn" onclick="openAssetEdit('${a.id}')">Edit</button>
+                <button class="ap-btn ap-btn-danger" onclick="deleteAsset('${a.id}')">Delete</button>
+              </div>
+            `}
           </div>
         </div>
       `;
     });
   }
 
-  html += `</div>`;
+  html += `
+          </div>
+        </div>
+      </main>
+    </div>
+  `;
+
   content.innerHTML = html;
+
+  // Live depreciation preview (DB still computes final values)
+  const pvEl = document.getElementById('asset_purchase_value');
+  const tvEl = document.getElementById('asset_today_value');
+  const preview = document.getElementById('asset_dep_preview');
+  const recompute = () => {
+    if(!preview) return;
+    const pv = Number(pvEl?.value || 0);
+    const tv = Number(tvEl?.value || 0);
+    if(!(pv > 0) || !(tv >= 0)){
+      preview.textContent = '';
+      return;
+    }
+    const dep = pv - tv;
+    const pct = pv > 0 ? (dep / pv) * 100 : 0;
+    preview.textContent = `Depreciation: ${inr(dep)} (${pct.toFixed(1)}%)`;
+  };
+  pvEl?.addEventListener('input', recompute);
+  tvEl?.addEventListener('input', recompute);
 }
 
 async function addAsset(){
   const name = (document.getElementById("asset_name")?.value || "").trim();
-  const value = Number(document.getElementById("asset_value")?.value || 0);
+  const category = (document.getElementById("asset_category")?.value || "").trim();
+  const condition = (document.getElementById("asset_condition")?.value || "Good").trim();
+  const purchaseDate = (document.getElementById("asset_purchase_date")?.value || "").trim();
+  const purchaseValue = Number(document.getElementById("asset_purchase_value")?.value || 0);
+  const todayValue = Number(document.getElementById("asset_today_value")?.value || 0);
 
-  if(!name || value <= 0){
-    alert("Asset name aur value sahi bhar");
+  if(!name || !(purchaseValue > 0) || !(todayValue >= 0) || !purchaseDate){
+    alert("Asset name, purchase date, purchase value aur today value sahi bhar");
     return;
   }
 
   // Try newer schema first; fallback to older schema.
   const attempt1 = await sb.from("company_assets").insert([{
     name,
-    current_value: value,
+    category: category || 'General',
+    condition: condition || 'Good',
+    purchase_date: purchaseDate,
+    purchase_value: purchaseValue,
+    current_value: todayValue,
     status: "ACTIVE"
   }]);
 
   if(attempt1?.error){
     const attempt2 = await sb.from("company_assets").insert([{
       name,
-      value
+      // legacy schemas might only have one value column
+      current_value: todayValue
     }]);
     if(attempt2?.error){
       console.error(attempt1.error, attempt2.error);
@@ -3347,7 +3935,16 @@ async function addAsset(){
   }
 
   document.getElementById("asset_name").value = "";
-  document.getElementById("asset_value").value = "";
+  const cat = document.getElementById("asset_category");
+  const cond = document.getElementById("asset_condition");
+  const pd = document.getElementById("asset_purchase_date");
+  const pv = document.getElementById("asset_purchase_value");
+  const tv = document.getElementById("asset_today_value");
+  if(cat) cat.value = "";
+  if(cond) cond.value = "Good";
+  if(pd) pd.value = "";
+  if(pv) pv.value = "";
+  if(tv) tv.value = "";
   showAssets();
 }
 
@@ -3670,10 +4267,26 @@ async function loadLayer3Businesses(){
   const holder = document.getElementById("l3_list");
   if(!holder) return;
 
-  const { data, error } = await sb
+  function businessValuation(b){
+    const raw = (
+      (b && (b.value ?? b.valuation ?? b.business_value ?? b.current_value ?? b.amount ?? b.total_value ?? b.valuation_amount))
+    );
+    const num = Number(raw ?? 0);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  // Avoid selecting columns that may not exist (e.g. 'value')
+  let res = await sb
     .from("businesses")
-    .select("id,name,type,value,created_at")
+    .select("*")
     .order("created_at", { ascending: false });
+
+  // If created_at doesn't exist, retry without ordering
+  if(res.error && String(res.error.message || '').toLowerCase().includes('created_at')){
+    res = await sb.from("businesses").select("*");
+  }
+
+  const { data, error } = res;
 
   if(error){
     holder.innerHTML = `Failed to load businesses: ${error.message}`;
@@ -3691,7 +4304,7 @@ async function loadLayer3Businesses(){
         <div class="card" style="margin:12px 0;">
           <b>${b.name || "-"}</b><br>
           Type: ${b.type || "-"}<br>
-          Value: <b>₹${Number(b.value || 0)}</b>
+          Value: <b>₹${businessValuation(b)}</b>
         </div>
       `;
     })
