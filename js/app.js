@@ -3668,7 +3668,12 @@ async function showAssets(){
 
     if(upErr){
       console.error(upErr);
-      alert('Update failed: ' + (upErr.message || ''));
+      const msg = String(upErr.message || '');
+      if(msg.toLowerCase().includes('column') && msg.toLowerCase().includes('does not exist')){
+        alert('Update failed: database schema update pending. Supabase SQL Editor me backend/sql/company_assets.sql run karo.\n\nError: ' + msg);
+      } else {
+        alert('Update failed: ' + msg);
+      }
       return;
     }
 
@@ -3910,7 +3915,7 @@ async function addAsset(){
     return;
   }
 
-  // Try newer schema first; fallback to older schema.
+  // Requires updated schema (purchase_value, purchase_date, category, condition)
   const attempt1 = await sb.from("company_assets").insert([{
     name,
     category: category || 'General',
@@ -3922,16 +3927,14 @@ async function addAsset(){
   }]);
 
   if(attempt1?.error){
-    const attempt2 = await sb.from("company_assets").insert([{
-      name,
-      // legacy schemas might only have one value column
-      current_value: todayValue
-    }]);
-    if(attempt2?.error){
-      console.error(attempt1.error, attempt2.error);
-      alert("Asset add nahi hua");
-      return;
+    console.error(attempt1.error);
+    const msg = String(attempt1.error.message || '');
+    if(msg.toLowerCase().includes('column') && msg.toLowerCase().includes('does not exist')){
+      alert('Asset add nahi hua: database schema update pending. Supabase SQL Editor me backend/sql/company_assets.sql run karo.\n\nError: ' + msg);
+    } else {
+      alert('Asset add nahi hua: ' + msg);
     }
+    return;
   }
 
   document.getElementById("asset_name").value = "";
