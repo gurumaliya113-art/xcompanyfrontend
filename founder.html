@@ -66,7 +66,7 @@
       padding: 12px 16px;
       margin-bottom: 8px;
       color: var(--muted);
-      border-radius: 14px;
+      border-radius: 10px;
       cursor: pointer;
       text-decoration: none;
       background: none;
@@ -79,7 +79,7 @@
     .sidebar a:hover, .sidebar li:hover, .sidebar button:hover {
       background: linear-gradient(90deg, #e2e4ea 0%, #f3f4f8 100%);
       color: #222;
-      transform: scale(1.04);
+      transform: none;
       box-shadow: 0 2px 12px #e2e4ea;
     }
     .main {
@@ -110,10 +110,10 @@
     }
     .card {
       background: var(--glass);
-      border-radius: 26px;
+      border-radius: 14px;
       box-shadow: var(--shadow);
       border: 1.5px solid var(--glass-border);
-      padding: 32px 28px;
+      padding: 22px 20px;
       margin-bottom: 18px;
       width: 100%;
       max-width: 980px;
@@ -130,7 +130,7 @@
       width: 100%;
       padding: 12px;
       margin-bottom: 14px;
-      border-radius: 12px;
+      border-radius: 10px;
       border: none;
       background: #f3f4f8;
       color: #222;
@@ -145,7 +145,7 @@
     }
     button {
       padding: 12px 0;
-      border-radius: 12px;
+      border-radius: 10px;
       border: none;
       background: linear-gradient(90deg,#e2e4ea,#f3f4f8);
       color: #222;
@@ -160,7 +160,7 @@
     button:hover {
       background: linear-gradient(90deg,#f3f4f8,#e2e4ea);
       color: #222;
-      transform: scale(1.04);
+      transform: translateY(-1px);
     }
     hr {
       border: none;
@@ -173,7 +173,7 @@
       margin-top: 30px;
       background: #f3f4f8;
       padding: 22px;
-      border-radius: 26px;
+      border-radius: 14px;
       border: 1.5px solid #e2e4ea;
       box-shadow: var(--shadow);
       width: 100% !important;
@@ -187,6 +187,57 @@
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap:18px;
       align-items: stretch;
+    }
+
+    .biz-actions{
+      display:flex;
+      gap:10px;
+      margin-top:10px;
+    }
+
+    /* Generic content safety */
+    #content{
+      width:100%;
+    }
+
+    #content img,
+    #content svg,
+    #content canvas{
+      max-width:100%;
+    }
+
+    #content table{
+      width:100% !important;
+      min-width:0 !important;
+    }
+
+    /* Square-cut premium overrides (beats css/theme.css specificity) */
+    body.x-theme .card{
+      border-radius: 12px !important;
+      padding: 20px 18px !important;
+    }
+    body.x-theme canvas{
+      border-radius: 12px !important;
+    }
+    body.x-theme input,
+    body.x-theme textarea,
+    body.x-theme select{
+      border-radius: 10px !important;
+    }
+    body.x-theme .main button,
+    body.x-theme .card button,
+    body.x-theme #loginScreen button,
+    body.x-theme #employeePanel button,
+    body.x-theme .sidebar button{
+      border-radius: 10px !important;
+    }
+    body.x-theme .sidebar a,
+    body.x-theme .sidebar li,
+    body.x-theme .sidebar button{
+      border-radius: 10px !important;
+    }
+    body.x-theme .biz-actions button{
+      border-radius: 10px !important;
     }
 
     .mobile-bar{ display:none; }
@@ -254,11 +305,110 @@
 
       .main{
         margin-left:0;
-        padding:24px 2vw;
+        padding:16px 0;
         padding-bottom: 108px;
+        align-items:stretch;
       }
-      .container { max-width: 98vw; }
-      .card { max-width: 98vw; padding: 18px 8vw; }
+      #title{
+        font-size:1.35rem;
+        margin: 6px 0 10px 0;
+        padding: 0 12px;
+        letter-spacing: .5px;
+      }
+
+      #content{ width:100%; }
+
+      /* Make any generated tables usable on mobile */
+      #content table{
+        display:block;
+        overflow:auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 14px;
+      }
+
+      /* Override common inline grid layouts from js/app.js */
+      #content [style*="display:grid"],
+      #content [style*="display: grid"]{
+        gap: 12px !important;
+      }
+
+      #content [style*="grid-template-columns:repeat(4,1fr)"],
+      #content [style*="grid-template-columns: repeat(4,1fr)"]{
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+
+      #content [style*="grid-template-columns:repeat(3"],
+      #content [style*="grid-template-columns: repeat(3"],
+      #content [style*="grid-template-columns:1fr 1fr"],
+      #content [style*="grid-template-columns: 1fr 1fr"],
+      #content [style*="grid-template-columns:repeat(2"],
+      #content [style*="grid-template-columns: repeat(2"],
+      #content [style*="grid-template-columns:repeat(auto"],
+      #content [style*="grid-template-columns: repeat(auto"]{
+        grid-template-columns: 1fr !important;
+      }
+
+      /* Prevent text overflow in cards */
+      body.x-theme .card{
+        overflow-wrap:anywhere;
+        word-break:break-word;
+      }
+
+      /* Slightly tighter, more square on mobile */
+      body.x-theme .card{ border-radius: 10px !important; padding: 16px 14px !important; }
+      body.x-theme canvas{ border-radius: 10px !important; }
+      body.x-theme .main button,
+      body.x-theme .card button,
+      body.x-theme .sidebar button{ border-radius: 10px !important; }
+
+      .container{
+        max-width:100vw;
+        width:100%;
+        padding: 0 12px;
+        gap: 14px;
+      }
+
+      .card{
+        max-width:100vw;
+        width:100%;
+        padding: 16px 14px;
+        margin-bottom: 12px;
+        border-radius: 12px;
+        font-size: 1rem;
+      }
+
+      canvas{
+        max-width: 100% !important;
+        height: 240px !important;
+        padding: 12px;
+        border-radius: 12px;
+      }
+
+      input, select{
+        padding: 10px;
+        border-radius: 10px;
+      }
+
+      button{
+        padding: 12px 12px;
+        border-radius: 10px;
+        font-size: 1rem;
+      }
+
+      .biz-grid{
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .biz-grid .card{ padding: 14px 12px !important; }
+
+      .biz-actions{
+        flex-direction:column;
+      }
+
+      .biz-actions button{
+        width:100%;
+      }
     }
 
     /* Company Layers (readable) */
@@ -439,12 +589,12 @@
           } else {
             graph = `<div style='height:32px'></div>`;
           }
-          html += `<div class='card' style='min-width:0;max-width:100%;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;padding:22px;'>
+          html += `<div class='card' style='min-width:0;max-width:100%;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;padding:16px;'>
             <div style='font-size:1.1rem;font-weight:700;color:#222;margin-bottom:2px;'>${b.name}</div>
             <div style='color:#555;font-size:.95rem;margin-bottom:6px;'>Type: <b>${b.type || '-'}</b></div>
             <div style='color:#2563eb;font-size:1rem;margin-bottom:4px;'>Value: ₹${b.value || 0}</div>
             <div style='margin-bottom:8px;'>${graph}</div>
-            <div style='display:flex;gap:10px;margin-top:10px;'>
+            <div class='biz-actions'>
               <button style='background:linear-gradient(90deg,#2563eb,#22c55e);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="window.openBusinessDashboard && window.openBusinessDashboard('${b.id}','${b.name}')">Open</button>
               <button style='background:linear-gradient(90deg,#ef4444,#f59e42);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="deleteBusiness('${b.id}','${b.name}')">Delete</button>
             </div>
