@@ -29,6 +29,7 @@
       background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 45%, #fafaf9 100%);
       color: var(--text);
       min-height: 100vh;
+      font-size: 15px;
     }
     .sidebar {
       width: 260px;
@@ -54,7 +55,7 @@
     }
     .sidebar h3 {
       margin: 0 0 36px;
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       font-weight: 700;
       color: #222;
       letter-spacing: 1px;
@@ -62,16 +63,16 @@
     }
     .sidebar a, .sidebar li, .sidebar button {
       display: block;
-      padding: 14px 18px;
-      margin-bottom: 10px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
       color: var(--muted);
-      border-radius: 16px;
+      border-radius: 14px;
       cursor: pointer;
       text-decoration: none;
       background: none;
       border: none;
       text-align: left;
-      font-size: 1.08rem;
+      font-size: 1rem;
       font-weight: 500;
       transition: background 0.2s, color 0.2s, transform 0.2s;
     }
@@ -83,7 +84,7 @@
     }
     .main {
       margin-left: 260px;
-      padding: 48px 0 32px 0;
+      padding: 32px 0 24px 0;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -91,32 +92,32 @@
       justify-content: flex-start;
     }
     #title {
-      font-size: 2.1rem;
+      font-size: 1.75rem;
       font-weight: 700;
       color: #222;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
       letter-spacing: 1px;
       text-shadow: 0 2px 8px #fff3;
       text-align: center;
     }
     .container {
-      max-width: 1600px;
+      max-width: 1300px;
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 36px;
+      gap: 24px;
       align-items: center;
     }
     .card {
       background: var(--glass);
-      border-radius: 32px;
+      border-radius: 26px;
       box-shadow: var(--shadow);
       border: 1.5px solid var(--glass-border);
-      padding: 48px 40px;
-      margin-bottom: 28px;
+      padding: 32px 28px;
+      margin-bottom: 18px;
       width: 100%;
-      max-width: 1100px;
-      font-size: 1.25rem;
+      max-width: 980px;
+      font-size: 1.05rem;
       animation: fadeInCard 1.1s cubic-bezier(.77,0,.18,1) forwards;
       opacity: 0;
       transform: scale(0.97);
@@ -127,13 +128,13 @@
     }
     input, select {
       width: 100%;
-      padding: 16px;
-      margin-bottom: 18px;
-      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 14px;
+      border-radius: 12px;
       border: none;
       background: #f3f4f8;
       color: #222;
-      font-size: 1.08rem;
+      font-size: 1rem;
       font-family: inherit;
       box-shadow: 0 2px 8px #e2e4ea;
       outline: none;
@@ -143,12 +144,12 @@
       background: #e2e4ea;
     }
     button {
-      padding: 16px 0;
-      border-radius: 14px;
+      padding: 12px 0;
+      border-radius: 12px;
       border: none;
       background: linear-gradient(90deg,#e2e4ea,#f3f4f8);
       color: #222;
-      font-size: 1.15rem;
+      font-size: 1.05rem;
       font-weight: 600;
       letter-spacing: 1px;
       box-shadow: 0 4px 16px #e2e4ea;
@@ -171,13 +172,21 @@
     canvas {
       margin-top: 30px;
       background: #f3f4f8;
-      padding: 32px;
-      border-radius: 32px;
+      padding: 22px;
+      border-radius: 26px;
       border: 1.5px solid #e2e4ea;
       box-shadow: var(--shadow);
       width: 100% !important;
-      max-width: 1000px !important;
-      height: 420px !important;
+      max-width: 920px !important;
+      height: 340px !important;
+    }
+
+    .biz-grid{
+      width:100%;
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap:18px;
+      align-items: stretch;
     }
     @media (max-width: 700px) {
       .sidebar { width: 100vw; height: auto; position: static; flex-direction: row; padding: 18px 8vw; }
@@ -348,7 +357,7 @@
             });
           }
         }
-        let html = `<div class='container'><div class='card' style="background:linear-gradient(120deg,#e0e7ff 0%,#f0fdf4 100%);box-shadow:0 8px 32px #a5b4fc33;"><h2 style="font-size:2.2rem;font-weight:700;margin-bottom:18px;letter-spacing:1px;color:#222;text-shadow:0 2px 8px #fff3;">Businesses</h2><div id='bizList' style='display:flex;flex-wrap:wrap;gap:32px;justify-content:center;'>`;
+        let html = `<div class='container'><div class='card' style="background:linear-gradient(120deg,#e0e7ff 0%,#f0fdf4 100%);box-shadow:0 8px 32px #a5b4fc33;"><h2 style="font-size:1.6rem;font-weight:700;margin-bottom:14px;letter-spacing:0.6px;color:#222;text-shadow:0 2px 8px #fff3;">Businesses</h2><div id='bizList' class='biz-grid'>`;
         data.forEach(b => {
           // Prepare mini-graph data
           let graph = '';
@@ -360,10 +369,10 @@
           } else {
             graph = `<div style='height:32px'></div>`;
           }
-          html += `<div class='card' style='min-width:260px;max-width:340px;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;'>
-            <div style='font-size:1.25rem;font-weight:700;color:#222;margin-bottom:2px;'>${b.name}</div>
-            <div style='color:#555;font-size:1rem;margin-bottom:6px;'>Type: <b>${b.type || '-'}</b></div>
-            <div style='color:#2563eb;font-size:1.1rem;margin-bottom:4px;'>Value: ₹${b.value || 0}</div>
+          html += `<div class='card' style='min-width:0;max-width:100%;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;padding:22px;'>
+            <div style='font-size:1.1rem;font-weight:700;color:#222;margin-bottom:2px;'>${b.name}</div>
+            <div style='color:#555;font-size:.95rem;margin-bottom:6px;'>Type: <b>${b.type || '-'}</b></div>
+            <div style='color:#2563eb;font-size:1rem;margin-bottom:4px;'>Value: ₹${b.value || 0}</div>
             <div style='margin-bottom:8px;'>${graph}</div>
             <div style='display:flex;gap:10px;margin-top:10px;'>
               <button style='background:linear-gradient(90deg,#2563eb,#22c55e);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="window.openBusinessDashboard && window.openBusinessDashboard('${b.id}','${b.name}')">Open</button>
