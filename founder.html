@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>The X Company – Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f0f9ff;
+      --glass: rgba(255,255,255,0.70);
+      --glass-border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #334155;
+      --blue: #0ea5e9;
+      --green: #22c55e;
+      --red: #dc2626;
+      --shadow: 0 8px 32px 0 rgba(2,6,23,0.10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 45%, #fafaf9 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .sidebar {
+      width: 260px;
+      height: 100vh;
+      position: fixed;
+      left: 0; top: 0;
+      background: var(--glass);
+      border-right: 1.5px solid var(--glass-border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 38px 26px 18px 26px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      animation: fadeInSidebar 1.2s cubic-bezier(.77,0,.18,1) forwards;
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    @keyframes fadeInSidebar {
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .sidebar h3 {
+      margin: 0 0 36px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #222;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 8px #fff3;
+    }
+    .sidebar a, .sidebar li, .sidebar button {
+      display: block;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      border-radius: 16px;
+      cursor: pointer;
+      text-decoration: none;
+      background: none;
+      border: none;
+      text-align: left;
+      font-size: 1.08rem;
+      font-weight: 500;
+      transition: background 0.2s, color 0.2s, transform 0.2s;
+    }
+    .sidebar a:hover, .sidebar li:hover, .sidebar button:hover {
+      background: linear-gradient(90deg, #e2e4ea 0%, #f3f4f8 100%);
+      color: #222;
+      transform: scale(1.04);
+      box-shadow: 0 2px 12px #e2e4ea;
+    }
+    .main {
+      margin-left: 260px;
+      padding: 48px 0 32px 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    #title {
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 18px;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 8px #fff3;
+      text-align: center;
+    }
+    .container {
+      max-width: 1600px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+      align-items: center;
+    }
+    .card {
+      background: var(--glass);
+      border-radius: 32px;
+      box-shadow: var(--shadow);
+      border: 1.5px solid var(--glass-border);
+      padding: 48px 40px;
+      margin-bottom: 28px;
+      width: 100%;
+      max-width: 1100px;
+      font-size: 1.25rem;
+      animation: fadeInCard 1.1s cubic-bezier(.77,0,.18,1) forwards;
+      opacity: 0;
+      transform: scale(0.97);
+      color: #222;
+    }
+    @keyframes fadeInCard {
+      to { opacity: 1; transform: scale(1); }
+    }
+    input, select {
+      width: 100%;
+      padding: 16px;
+      margin-bottom: 18px;
+      border-radius: 14px;
+      border: none;
+      background: #f3f4f8;
+      color: #222;
+      font-size: 1.08rem;
+      font-family: inherit;
+      box-shadow: 0 2px 8px #e2e4ea;
+      outline: none;
+      transition: background 0.2s;
+    }
+    input:focus, select:focus {
+      background: #e2e4ea;
+    }
+    button {
+      padding: 16px 0;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(90deg,#e2e4ea,#f3f4f8);
+      color: #222;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 16px #e2e4ea;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background: linear-gradient(90deg,#f3f4f8,#e2e4ea);
+      color: #222;
+      transform: scale(1.04);
+    }
+    hr {
+      border: none;
+      height: 1.5px;
+      background: linear-gradient(90deg,transparent,#e2e4ea,transparent);
+      margin: 36px 0;
+      width: 100%;
+    }
+    canvas {
+      margin-top: 30px;
+      background: #f3f4f8;
+      padding: 32px;
+      border-radius: 32px;
+      border: 1.5px solid #e2e4ea;
+      box-shadow: var(--shadow);
+      width: 100% !important;
+      max-width: 1000px !important;
+      height: 420px !important;
+    }
+    @media (max-width: 700px) {
+      .sidebar { width: 100vw; height: auto; position: static; flex-direction: row; padding: 18px 8vw; }
+      .main { margin-left: 0; padding: 24px 2vw; }
+      .container { max-width: 98vw; }
+      .card { max-width: 98vw; padding: 18px 8vw; }
+    }
+
+    /* Company Layers (readable) */
+    .layerMapWrap{
+      margin-top:14px;
+      padding:18px;
+      border:1.5px solid var(--glass-border);
+      border-radius:18px;
+      background: rgba(255,255,255,0.55);
+    }
+    .layerMapStage{
+      position:relative;
+      min-height:420px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .layerRings{ position:relative; width:360px; height:360px; }
+    .layerRing{
+      position:absolute;
+      inset:0;
+      border-radius:999px;
+      border:1px solid rgba(15,23,42,.10);
+      background:radial-gradient(circle at 30% 30%, rgba(59,130,246,.10), rgba(255,255,255,.00) 58%);
+      box-shadow: 0 18px 38px rgba(2,6,23,.08);
+    }
+    .ring3{ opacity:.42; }
+    .ring2{ inset:50px; opacity:.54; }
+    .ring1{ inset:92px; opacity:.66; }
+    .ring0{
+      inset:125px;
+      opacity:1;
+      background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.78));
+      border:1px solid rgba(15,23,42,.14);
+      box-shadow: 0 12px 26px rgba(2,6,23,.10);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .layerCoreText{
+      text-align:center;
+      font-weight:850;
+      line-height:1.06;
+      color:rgba(15,23,42,.94);
+      font-size:13px;
+      letter-spacing:.2px;
+    }
+    .layerTag{
+      position:absolute;
+      width:270px;
+      padding:10px 12px;
+      border-radius:14px;
+      background:rgba(255,255,255,.96);
+      border:1px solid rgba(15,23,42,.12);
+      box-shadow: 0 10px 24px rgba(2,6,23,.10);
+      backdrop-filter: blur(10px);
+      z-index:6;
+    }
+    .layerTitle{
+      font-weight:850;
+      color:rgba(15,23,42,.92);
+      font-size:15px;
+      line-height:1.1;
+    }
+    .layerDesc{
+      margin-top:4px;
+      font-weight:650;
+      color:rgba(15,23,42,.64);
+      font-size:12px;
+      line-height:1.25;
+    }
+    .layerTag.tag3{ left:50%; top:12px; transform:translateX(-50%); text-align:center; }
+    .layerTag.tag2{ left:18px; top:62%; transform:translateY(-50%); }
+    .layerTag.tag1{ right:18px; top:62%; transform:translateY(-50%); text-align:right; }
+
+    @media (max-width: 760px){
+      .layerMapStage{ min-height:520px; flex-direction:column; gap:10px; padding:10px 0; }
+      .layerRings{ width:320px; height:320px; }
+      .ring2{ inset:44px; }
+      .ring1{ inset:82px; }
+      .ring0{ inset:112px; }
+      .layerTag{
+        position:static;
+        width:100%;
+        max-width:520px;
+        margin:0 auto;
+        text-align:left;
+      }
+      .layerTag.tag1,.layerTag.tag2,.layerTag.tag3{ transform:none; }
+    }
+  </style>
+</head>
+
+<body class="x-theme">
+
+<div class="sidebar">
+  <h3>⚡ The X Company</h3>
+
+  <button id="logoutBtn">Logout</button>
+
+  <a onclick="showLayersHome()">Layers</a>
+
+  <a onclick="showDashboard()">Dashboard</a>
+  <a onclick="showBusinesses()">Businesses</a>
+  <a onclick="showAddBusiness()">Add Business</a>
+  <a onclick="showEmployees()">Employees of The X Company</a>
+  <a onclick="showAddEmployee()">Add Employee</a>
+  <a onclick="showMoneyPool()">Money / Cash + Bank</a>
+  <a onclick="showAssets()">Assets</a>
+  <a onclick="showInvestors()">Investors</a>
+  <a onclick="showDataEntriesHome()">Data Entries</a>
+</div>
+
+<div class="main">
+  <h1 id="title">Dashboard</h1>
+  <div id="content"></div>
+</div>
+
+<script>
+  /* ===== SUPABASE ===== */
+  const sb = supabase.createClient(
+    "https://ecjxynuccpncwsogezos.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
+  );
+
+  const title = document.getElementById("title");
+  const content = document.getElementById("content");
+
+  /* ===== DASHBOARD ===== */
+  async function showDashboard(){
+    title.innerText = "Company Dashboard";
+    content.innerHTML = `
+      <div class="container">
+        <div class="card">Dashboard Loaded Successfully</div>
+      </div>
+    `;
+  }
+
+  /* ===== BASIC SCREENS ===== */
+  function showAddEmployee(){
+    title.innerText="Add Employee";
+    content.innerHTML=`<div class="card">Add Employee Screen</div>`;
+  }
+  function showBusinesses(){
+      title.innerText = "Businesses";
+      content.innerHTML = `<div class="container"><div class="card">Loading businesses...</div></div>`;
+      sb.from("businesses").select("id,name,type,value").then(async ({ data, error }) => {
+        if (error || !data) {
+          content.innerHTML = `<div class='container'><div class='card'>Failed to load businesses</div></div>`;
+          return;
+        }
+        // Fetch reports for all businesses for mini-graphs
+        const ids = data.map(b => b.id);
+        let reportsMap = {};
+        if(ids.length) {
+          const { data: reports } = await sb.from("reports").select("business_id,month,profit").in("business_id", ids);
+          if(reports) {
+            reports.forEach(r => {
+              if(!reportsMap[r.business_id]) reportsMap[r.business_id] = [];
+              reportsMap[r.business_id].push(r);
+            });
+          }
+        }
+        let html = `<div class='container'><div class='card' style="background:linear-gradient(120deg,#e0e7ff 0%,#f0fdf4 100%);box-shadow:0 8px 32px #a5b4fc33;"><h2 style="font-size:2.2rem;font-weight:700;margin-bottom:18px;letter-spacing:1px;color:#222;text-shadow:0 2px 8px #fff3;">Businesses</h2><div id='bizList' style='display:flex;flex-wrap:wrap;gap:32px;justify-content:center;'>`;
+        data.forEach(b => {
+          // Prepare mini-graph data
+          let graph = '';
+          const rep = reportsMap[b.id] || [];
+          if(rep.length > 1) {
+            const profits = rep.sort((a,b)=>a.month.localeCompare(b.month)).map(r=>r.profit);
+            const max = Math.max(...profits,1), min = Math.min(...profits,0);
+            graph = `<svg width="100" height="32" style="margin:8px 0 0 0;display:block;"><polyline fill="none" stroke="#3b82f6" stroke-width="3" points="${profits.map((p,i)=>`${i*20},${28-24*((p-min)/(max-min||1))}`).join(' ')}"/><circle r="3" fill="#22c55e" cx="${(profits.length-1)*20}" cy="${28-24*((profits[profits.length-1]-min)/(max-min||1))}"/></svg>`;
+          } else {
+            graph = `<div style='height:32px'></div>`;
+          }
+          html += `<div class='card' style='min-width:260px;max-width:340px;background:linear-gradient(120deg,#fff 60%,#e0f2fe 100%);border:2px solid #a5b4fc;box-shadow:0 4px 24px #a5b4fc22;position:relative;overflow:hidden;'>
+            <div style='font-size:1.25rem;font-weight:700;color:#222;margin-bottom:2px;'>${b.name}</div>
+            <div style='color:#555;font-size:1rem;margin-bottom:6px;'>Type: <b>${b.type || '-'}</b></div>
+            <div style='color:#2563eb;font-size:1.1rem;margin-bottom:4px;'>Value: ₹${b.value || 0}</div>
+            <div style='margin-bottom:8px;'>${graph}</div>
+            <div style='display:flex;gap:10px;margin-top:10px;'>
+              <button style='background:linear-gradient(90deg,#2563eb,#22c55e);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="window.openBusinessDashboard && window.openBusinessDashboard('${b.id}','${b.name}')">Open</button>
+              <button style='background:linear-gradient(90deg,#ef4444,#f59e42);color:#fff;font-weight:600;flex:1;border-radius:12px;' onclick="deleteBusiness('${b.id}','${b.name}')">Delete</button>
+            </div>
+          </div>`;
+        });
+        html += `</div></div></div>`;
+        content.innerHTML = html;
+      });
+  }
+  function showEmployees(){
+    title.innerText="Employees";
+    content.innerHTML=`<div class="card">Employees Screen</div>`;
+  }
+  function showMoneyPool(){
+    title.innerText="Money Pool";
+    content.innerHTML=`<div class="card">Money Pool Screen</div>`;
+  }
+  function showAddBusiness(){
+    title.innerText="Add Business";
+    content.innerHTML=`<div class="card">Add Business Screen</div>`;
+  }
+  function showAssets(){
+    title.innerText="Assets";
+    content.innerHTML=`<div class="card">Assets Screen</div>`;
+  }
+
+  /* ===== LOGOUT ===== */
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await sb.auth.signOut();
+    window.location.href = "index.html";
+  });
+
+  /* LOAD DEFAULT */
+  showDashboard();
+  async function saveDailyReport(businessId){
+  const date = document.getElementById("rep_date").value;
+  const income = Number(document.getElementById("rep_income").value || 0);
+  const expense = Number(document.getElementById("rep_expense").value || 0);
+  const pool = Number(document.getElementById("rep_pool").value || 0);
+
+  if(!date){
+    alert("Please select date");
+    return;
+  }
+
+  const { error } = await sb.rpc("save_daily_report_backend", {
+    p_business_id: businessId,
+    p_date: date,
+    p_income: income,
+    p_expense: expense,
+    p_pool_taken: pool
+  });
+
+  if(error){
+    alert("Save failed");
+    console.error(error);
+    return;
+  }
+
+  alert("Report saved successfully");
+  openBusiness(businessId, document.getElementById("title").innerText.split(" – ")[0]);
+}
+
+</script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

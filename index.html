@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FCP System Landing Page</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="landing-body">
+  <div class="container">
+
+    <!-- 1. Hero/Intro Section -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <h1 class="hero-title">The X Company</h1>
+        <div class="hero-tagline">A revolutionary system for transparent, fair, and high-growth company structure.</div>
+        <div class="hero-metrics">
+          <div class="metric-card metric-blue">
+            <div class="metric-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="7" y="10" width="10" height="8" rx="2" fill="#2563eb"/></svg></div>
+            <div class="metric-value">85,500</div>
+            <div class="metric-desc">Total Shares</div>
+          </div>
+          <div class="metric-card metric-purple">
+            <div class="metric-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="8" fill="#a78bfa"/></svg></div>
+            <div class="metric-value">17,100</div>
+            <div class="metric-desc">Work Pool</div>
+          </div>
+          <div class="metric-card metric-green">
+            <div class="metric-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="6" y="6" width="12" height="12" rx="3" fill="#22c55e"/></svg></div>
+            <div class="metric-value">20%</div>
+            <div class="metric-desc">Profit Share</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-bottom-gradient"></div>
+      <div style="text-align:center; margin-top:32px;">
+        <button onclick="window.location.href='dashboard.html'" style="padding: 16px 32px; font-size: 1.15rem; font-weight: 600; border-radius: 24px; background: linear-gradient(90deg,#2563eb,#22c55e); color: #fff; border: none; box-shadow: 0 4px 24px #2563eb22; cursor: pointer; transition: background 0.2s;">Get in the world of X Company</button>
+      </div>
+    </section>
+
+    <!-- 2. System Architecture Section -->
+    <section class="architecture-section fade-in">
+      <h2 class="section-title">System Architecture</h2>
+      <p class="section-desc">A clearly separated three-layer structure designed for control, contribution, and asset protection</p>
+      <div class="architecture-layers">
+        <div class="layer-card layer-blue motion-card">
+          <div class="layer-badge">1</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="8" width="16" height="12" rx="3" fill="#2563eb"/></svg></div>
+          <h3>Founders (Control Layer)</h3>
+          <div class="layer-highlight">Ownership: <span>60% → 40% (min)</span></div>
+          <ul>
+            <li>Permanent voting power and asset control</li>
+            <li>Task approval and verification authority</li>
+            <li>Strategic decision-making rights</li>
+            <li>Optional value contribution to Layer 2</li>
+          </ul>
+        </div>
+        <div class="layer-card layer-purple motion-card">
+          <div class="layer-badge">2</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="8" fill="#a78bfa"/></svg></div>
+          <h3>Work-for-Shares (Participation Layer)</h3>
+          <div class="layer-highlight">Share Pool: <span>17,100 fixed shares</span></div>
+          <ul>
+            <li>Milestone-based rewards (no hourly wage)</li>
+            <li>Structured vesting: 0 → 3 → 6 months</li>
+            <li>Proof-of-work verification required</li>
+            <li>Finite pool with recycling mechanism</li>
+          </ul>
+        </div>
+        <div class="layer-card layer-green motion-card">
+          <div class="layer-badge">3</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="6" y="6" width="12" height="12" rx="3" fill="#22c55e"/></svg></div>
+          <h3>Assets & Profit (Asset Layer)</h3>
+          <div class="layer-highlight">Profit Share: <span>20% maximum</span></div>
+          <ul>
+            <li>Complete company ownership of all assets</li>
+            <li>Asset Profit Pool (APP) distribution</li>
+            <li>Weighted allocation based on contribution</li>
+            <li>No forced buyouts or asset claims</li>
+          </ul>
+          <div class="arch-fixed">Fixed &amp; Immutable</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Share Structure Section -->
+    <section class="share-structure-section fade-in">
+      <div class="section-badge glass-badge"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="7" y="10" width="10" height="8" rx="2" fill="#2563eb"/></svg> Fixed & Immutable</div>
+      <h2 class="section-title">Share Structure</h2>
+      <p class="section-desc">85,500 total shares that can never be increased outside defined system rules</p>
+      <div class="share-structure-grid">
+        <div class="share-structure-left">
+          <div class="donut-card motion-card">
+            <svg viewBox="0 0 180 180" width="240" height="240">
+              <circle cx="90" cy="90" r="80" fill="#f3f4f6"/>
+              <path d="M90 90 m 0 -80 a 80 80 0 1 1 68.2 39.2" stroke="#2563eb" stroke-width="24" fill="none"/>
+              <path d="M90 90 m 0 -80 a 80 80 0 0 1 39.2 148.2" stroke="#a78bfa" stroke-width="24" fill="none"/>
+              <path d="M90 90 m 0 -80 a 80 80 0 0 1 -107.2 39.2" stroke="#a8a29e" stroke-width="24" fill="none"/>
+              <circle cx="90" cy="90" r="56" fill="#fff"/>
+            </svg>
+            <div class="donut-legend">
+              <span class="legend-dot legend-blue"></span> Founders (Layer 1) 60%<br>
+              <span class="legend-dot legend-purple"></span> Work Pool (Layer 2) 20%<br>
+              <span class="legend-dot legend-gray"></span> Reserved/Future 20%
+            </div>
+          </div>
+        </div>
+        <div class="share-structure-right">
+          <div class="share-card card-blue motion-card">
+            <div class="card-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="7" y="10" width="10" height="8" rx="2" fill="#2563eb"/></svg></div>
+            <h3>Founder Control</h3>
+            <div class="card-big">60%</div>
+            <div class="card-desc">51,300 shares currently held by founders</div>
+            <div class="card-highlight card-orange">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2v20" stroke="#f59e42" stroke-width="2"/></svg>
+              <span>Protected Floor</span>
+              <div class="card-highlight-value">40% Minimum</div>
+              <div class="card-highlight-desc">Can never go below this threshold</div>
+            </div>
+          </div>
+          <div class="share-card card-purple motion-card">
+            <div class="card-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="7" y="10" width="10" height="8" rx="2" fill="#a78bfa"/></svg></div>
+            <h3>Work Pool</h3>
+            <div class="card-big">17,100</div>
+            <div class="card-desc">Fixed shares for performance-based allocation</div>
+            <ul class="card-list">
+              <li>100 shares on joining (locked)</li>
+              <li>+50 shares after 3 months</li>
+              <li>+100 shares after 6 months</li>
+            </ul>
+          </div>
+          <div class="share-card card-gray motion-card">
+            <div class="card-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="7" y="10" width="10" height="8" rx="2" fill="#a8a29e"/></svg></div>
+            <h3>Immutable Rules</h3>
+            <ul class="card-list">
+              <li>No new shares outside system rules</li>
+              <li>Automatic dilution prohibited</li>
+              <li>Shares only recycled or contributed by founders</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+          </ul>
+        </div>
+        <div class="transition-bottom-card">
+          <div class="transition-bottom-title">Transition Process</div>
+          <ul class="transition-process-list">
+            <li><span class="process-badge badge-blue">1</span> Work-for-Shares Closure</li>
+            <li><span class="process-badge badge-purple">2</span> Salary Structure Design</li>
+            <li><span class="process-badge badge-green">3</span> New Hire Integration</li>
+            <li><span class="process-badge badge-indigo">4</span> System Audit & Documentation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="transition-footer-badge-premium">FCP: Founder-safe, audit-ready, and designed for sustainable growth</div>
+    </section>
+
+    <!-- Core Principles Section -->
+    <section class="principles-section fade-in">
+      <div class="section-badge glass-badge" style="background:#e0e7ef;color:#2563eb;">&#128161; Foundation Philosophy</div>
+      <h2 class="section-title">Core Principles</h2>
+      <p class="section-desc">Six immutable rules that govern the entire FCP system</p>
+      <div class="principles-premium-grid">
+        <div class="principle-premium-card card-blue">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="10" fill="#2563eb"/></svg></div>
+          <div class="principle-premium-title">Founders Must Always Retain Control</div>
+          <div class="principle-premium-desc">Strategic decisions, voting power, and asset control permanently remain with founders. Minimum 40% ownership floor is immutable.</div>
+        </div>
+        <div class="principle-premium-card card-pink">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" rx="4" fill="#f472b6"/></svg></div>
+          <div class="principle-premium-title">Only Profits May Be Shared</div>
+          <div class="principle-premium-desc">Asset ownership is never distributed. Only profits from assets may be allocated (up to 20%) through the Asset Profit Pool.</div>
+        </div>
+        <div class="principle-premium-card card-purple">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="10" fill="#a78bfa"/></svg></div>
+          <div class="principle-premium-title">Ownership Earned Through Contribution</div>
+          <div class="principle-premium-desc">Participation is merit-based and performance-driven. All rewards require verified proof of work and explicit approval.</div>
+        </div>
+        <div class="principle-premium-card card-green">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" rx="4" fill="#22c55e"/></svg></div>
+          <div class="principle-premium-title">Assets Belong 100% to Company</div>
+          <div class="principle-premium-desc">No employee or participant can own, control, or force-sell company assets. Complete protection of business infrastructure.</div>
+        </div>
+        <div class="principle-premium-card card-orange">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" rx="4" fill="#f59e42"/></svg></div>
+          <div class="principle-premium-title">Equity Incentives Are Temporary</div>
+          <div class="principle-premium-desc">Work-for-shares model is designed as a bootstrap mechanism, not a permanent structure. Eventually transitions to traditional employment.</div>
+        </div>
+        <div class="principle-premium-card card-indigo">
+          <div class="principle-premium-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" rx="4" fill="#6366f1"/></svg></div>
+          <div class="principle-premium-title">System Must Reach Traditional Structure</div>
+          <div class="principle-premium-desc">Once stability is achieved, the system transitions to fixed salaries, bonuses, and limited ESOPs with full transparency.</div>
+        </div>
+      </div>
+      <div class="philosophy-premium-footer">
+        <div class="philosophy-premium-title">System Philosophy</div>
+        <div class="philosophy-premium-desc">The FCP system creates a founder-safe, incentive-driven company framework that can be cleanly coded, audited, scaled, and explained — enabling real value creation without compromising control, assets, or long-term business health. It acknowledges that bootstrapping requires sacrifice, but ensures that sacrifice is temporary, measured, and leads to a sustainable traditional business structure.</div>
+      </div>
+    </section>
+
+    <!-- System Architecture Section -->
+    ...existing code...
+      <p class="section-desc">A clearly separated three-layer structure designed for control, contribution, and asset protection</p>
+      <div class="architecture-layers">
+        <div class="layer-card layer-blue motion-card">
+          <div class="layer-badge">1</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="8" width="16" height="12" rx="3" fill="#2563eb"/></svg></div>
+          <h3>Founders (Control Layer)</h3>
+          <div class="layer-highlight">Ownership: <span>60% → 40% (min)</span></div>
+          <ul>
+            <li>Permanent voting power and asset control</li>
+            <li>Task approval and verification authority</li>
+            <li>Strategic decision-making rights</li>
+            <li>Optional value contribution to Layer 2</li>
+          </ul>
+        </div>
+        <div class="layer-card layer-purple motion-card">
+          <div class="layer-badge">2</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="8" fill="#a78bfa"/></svg></div>
+          <h3>Work-for-Shares (Participation Layer)</h3>
+          <div class="layer-highlight">Share Pool: <span>17,100 fixed shares</span></div>
+          <ul>
+            <li>Milestone-based rewards (no hourly wage)</li>
+            <li>Structured vesting: 0 → 3 → 6 months</li>
+            <li>Proof-of-work verification required</li>
+            <li>Finite pool with recycling mechanism</li>
+          </ul>
+        </div>
+        <div class="layer-card layer-green motion-card">
+          <div class="layer-badge">3</div>
+          <div class="layer-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="6" y="6" width="12" height="12" rx="3" fill="#22c55e"/></svg></div>
+          <h3>Assets & Profit (Asset Layer)</h3>
+          <div class="layer-highlight">Profit Share: <span>20% maximum</span></div>
+          <ul>
+            <li>Complete company ownership of all assets</li>
+            <li>Asset Profit Pool (APP) distribution</li>
+            <li>Weighted allocation based on contribution</li>
+            <li>No forced buyouts or asset claims</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+ 
+  <!-- Work Verification Process Section -->
+  <section class="verification-section fade-in">
+    <div class="container">
+      <div class="section-badge glass-badge"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="7" y="10" width="10" height="8" rx="2" fill="#a78bfa"/></svg> Verification Required</div>
+      <h2 class="section-title">Work Verification Process</h2>
+      <p class="section-desc">Every contribution must pass through a mandatory proof-of-work system</p>
+      <div class="verification-grid">
+        <div class="verification-card card-blue motion-card">
+          <div class="card-step-badge">01</div>
+          <div class="card-step-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="6" y="6" width="12" height="12" rx="3" fill="#2563eb"/></svg></div>
+          <div class="card-step-title">Task Definition</div>
+          <div class="card-step-desc">Clear objectives and measurable outputs defined</div>
+        </div>
+        <div class="verification-card card-purple motion-card">
+          <div class="card-step-badge">02</div>
+          <div class="card-step-icon"><svg viewBox="0 0 24 24" width="32" height="32"><rect x="6" y="6" width="12" height="12" rx="3" fill="#a78bfa"/></svg></div>
+          <div class="card-step-title">Work Submission</div>
+          <div class="card-step-desc">Proof submitted: dashboards, screenshots, identifiers</div>
+        </div>
+        <div class="verification-card card-green motion-card">
+          <div class="card-step-badge">03</div>
+          <div class="card-step-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="10" fill="#22c55e"/></svg></div>
+          <div class="card-step-title">Founder Approval</div>
+          <div class="card-step-desc">Verification and explicit approval required</div>
+        </div>
+        <div class="verification-card card-orange motion-card">
+          <div class="card-step-badge">04</div>
+          <div class="card-step-icon"><svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="10" fill="#f59e42"/></svg></div>
+          <div class="card-step-title">Points → Shares</div>
+          <div class="card-step-desc">Monthly conversion with predefined caps</div>
+        </div>
+      </div>
+      <div class="critical-reqs">
+        <div class="req-card req-blue">No Approval = No Rewards</div>
+        <div class="req-card req-purple">Milestone-Based Only</div>
+        <div class="req-card req-green">Monthly Conversion Caps</div>
+        <div class="req-card req-orange">Proof Required</div>
+        <div class="req-card req-gray">Pool Refill Control</div>
+        <div class="req-card req-indigo">Founder Authority</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Growth Trajectory Section -->
+  <section class="growth-section fade-in">
+    <div class="container">
+      <div class="section-badge glass-badge"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="7" y="10" width="10" height="8" rx="2" fill="#6366f1"/></svg> Value Growth Model</div>
+      <h2 class="section-title">Growth Trajectory</h2>
+      <p class="section-desc">Fixed share count means company growth directly increases per-share value</p>
+      <div class="growth-main-grid">
+        <div class="growth-chart-card motion-card">
+          <div class="growth-chart-title">Company Valuation Growth</div>
+          <div class="growth-chart-sub">Projected growth from ₹8.55L to ₹100L with fixed share structure</div>
+          <div class="growth-chart-area">
+            <!-- SVG Area Chart -->
+            <svg viewBox="0 0 420 220" width="100%" height="220">
+              <defs>
+                <linearGradient id="blueGradient2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#6366f1" stop-opacity="0.7"/>
+                  <stop offset="100%" stop-color="#6366f1" stop-opacity="0.1"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,200 Q84,160 168,120 Q252,80 336,40 Q420,10 420,200 L420,220 L0,220 Z" fill="url(#blueGradient2)"/>
+              <polyline points="0,200 84,160 168,120 336,40 420,10" fill="none" stroke="#6366f1" stroke-width="3"/>
+              <text x="0" y="215" font-size="14" fill="#64748b">Current</text>
+              <text x="84" y="215" font-size="14" fill="#64748b">Stage 1</text>
+              <text x="168" y="215" font-size="14" fill="#64748b">Stage 2</text>
+              <text x="336" y="215" font-size="14" fill="#64748b">Stage 3</text>
+              <text x="390" y="215" font-size="14" fill="#64748b">Maturity</text>
+              <text x="10" y="30" font-size="14" fill="#64748b">Valuation (₹ Lakh)</text>
+            </svg>
+          </div>
+        </div>
+        <div class="growth-value-card motion-card">
+          <div class="growth-value-title">Per-Share Value Increase</div>
+          <div class="growth-value-grid">
+            <div class="growth-value-box">
+              <div class="growth-value-label">Current</div>
+              <div class="growth-value-main">₹10</div>
+              <div class="growth-value-sub">per share</div>
+            </div>
+            <div class="growth-value-box">
+              <div class="growth-value-label">Stage 1</div>
+              <div class="growth-value-main">₹17.5</div>
+              <div class="growth-value-sub">per share</div>
+            </div>
+            <div class="growth-value-box">
+              <div class="growth-value-label">Stage 2</div>
+              <div class="growth-value-main">₹29.2</div>
+              <div class="growth-value-sub">per share</div>
+            </div>
+            <div class="growth-value-box">
+              <div class="growth-value-label">Stage 3</div>
+              <div class="growth-value-main">₹58.5</div>
+              <div class="growth-value-sub">per share</div>
+            </div>
+            <div class="growth-value-box">
+              <div class="growth-value-label">Maturity</div>
+              <div class="growth-value-main">₹117</div>
+              <div class="growth-value-sub">per share</div>
+            </div>
+          </div>
+          <div class="growth-key-insight-box">
+            <span class="growth-key-icon"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="7" y="10" width="10" height="8" rx="2" fill="#6366f1"/></svg></span>
+            <span class="growth-key-text"><b>Key Insight:</b> With a fixed 85,500 shares, every ₹1 increase in company value directly increases the per-share value by ₹0.0000117. As the company grows from ₹8.55L to ₹100L, share value increases from ₹10 to ₹117 per share.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>
+ <a href="dashboard.html">
+  Get into The X Company
+</a>
+ <button onclick="location.href='dashboard.html'">
+  Get into The X Company
+</button>
+    
+
+  <!-- All premium sections go here, outside nav -->
+  <!-- ...existing code for architecture, share structure, verification, asset/profit, growth, transition sections... -->
+
+  <script src="js/landing.js"></script>
+</body>
+</html>
