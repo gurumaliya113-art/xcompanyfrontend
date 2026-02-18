@@ -188,9 +188,75 @@
       gap:18px;
       align-items: stretch;
     }
+
+    .mobile-bar{ display:none; }
+    .nav-links{ display:block; }
+
     @media (max-width: 700px) {
-      .sidebar { width: 100vw; height: auto; position: static; flex-direction: row; padding: 18px 8vw; }
-      .main { margin-left: 0; padding: 24px 2vw; }
+      /* Bottom nav (Meesho-style): compact bar + expandable stacked menu */
+      .sidebar{
+        width:100vw;
+        height:auto;
+        position:fixed;
+        left:0;
+        right:0;
+        bottom:0;
+        top:auto;
+        padding:10px 12px 12px 12px;
+        flex-direction:column;
+        align-items:stretch;
+        gap:10px;
+        border-right:none;
+        border-top: 1.5px solid var(--glass-border);
+        border-radius: 18px 18px 0 0;
+      }
+
+      .sidebar h3{ display:none; }
+
+      .mobile-bar{
+        display:flex;
+        gap:10px;
+        align-items:center;
+      }
+
+      .mobile-bar button{
+        flex:1;
+        margin:0;
+        padding:12px 14px;
+        border-radius:14px;
+        font-size:1rem;
+      }
+
+      .nav-links{
+        display:none;
+      }
+
+      .sidebar.is-open .nav-links{
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap:10px;
+        max-height: 56vh;
+        overflow:auto;
+        padding-right:2px;
+      }
+
+      .sidebar.is-open .nav-links a{
+        margin:0;
+        padding:12px 14px;
+        border-radius:14px;
+        background: rgba(255,255,255,0.55);
+        border: 1px solid rgba(15,23,42,.10);
+      }
+
+      .sidebar.is-open .nav-links a:hover{
+        transform:none;
+      }
+
+      .main{
+        margin-left:0;
+        padding:24px 2vw;
+        padding-bottom: 108px;
+      }
       .container { max-width: 98vw; }
       .card { max-width: 98vw; padding: 18px 8vw; }
     }
@@ -292,19 +358,23 @@
 <div class="sidebar">
   <h3>⚡ The X Company</h3>
 
-  <button id="logoutBtn">Logout</button>
+  <div class="mobile-bar">
+    <button id="mobileMenuToggle" type="button">Menu</button>
+    <button id="logoutBtn" type="button">Logout</button>
+  </div>
 
-  <a onclick="showLayersHome()">Layers</a>
-
-  <a onclick="showDashboard()">Dashboard</a>
-  <a onclick="showBusinesses()">Businesses</a>
-  <a onclick="showAddBusiness()">Add Business</a>
-  <a onclick="showEmployees()">Employees of The X Company</a>
-  <a onclick="showAddEmployee()">Add Employee</a>
-  <a onclick="showMoneyPool()">Money / Cash + Bank</a>
-  <a onclick="showAssets()">Assets</a>
-  <a onclick="showInvestors()">Investors</a>
-  <a onclick="showDataEntriesHome()">Data Entries</a>
+  <div class="nav-links">
+    <a onclick="showLayersHome()">Layers</a>
+    <a onclick="showDashboard()">Dashboard</a>
+    <a onclick="showBusinesses()">Businesses</a>
+    <a onclick="showAddBusiness()">Add Business</a>
+    <a onclick="showEmployees()">Employees of The X Company</a>
+    <a onclick="showAddEmployee()">Add Employee</a>
+    <a onclick="showMoneyPool()">Money / Cash + Bank</a>
+    <a onclick="showAssets()">Assets</a>
+    <a onclick="showInvestors()">Investors</a>
+    <a onclick="showDataEntriesHome()">Data Entries</a>
+  </div>
 </div>
 
 <div class="main">
@@ -406,6 +476,43 @@
     await sb.auth.signOut();
     window.location.href = "index.html";
   });
+
+  /* ===== MOBILE MENU (BOTTOM NAV) ===== */
+  (function(){
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.getElementById('mobileMenuToggle');
+    if(!sidebar || !toggle) return;
+
+    function isMobile(){
+      return window.innerWidth <= 700;
+    }
+
+    function setOpen(next){
+      if(next) sidebar.classList.add('is-open');
+      else sidebar.classList.remove('is-open');
+      toggle.textContent = sidebar.classList.contains('is-open') ? 'Close' : 'Menu';
+    }
+
+    toggle.addEventListener('click', function(){
+      setOpen(!sidebar.classList.contains('is-open'));
+    });
+
+    sidebar.addEventListener('click', function(e){
+      if(!isMobile()) return;
+      const t = e.target;
+      if(t && t.tagName === 'A'){
+        setOpen(false);
+      }
+    }, true);
+
+    window.addEventListener('resize', function(){
+      if(!isMobile()) setOpen(false);
+      else toggle.textContent = sidebar.classList.contains('is-open') ? 'Close' : 'Menu';
+    });
+
+    // Ensure initial label
+    setOpen(false);
+  })();
 
   /* LOAD DEFAULT */
   title.innerText = "Company Dashboard";
