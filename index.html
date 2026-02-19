@@ -145,49 +145,93 @@
           }
         }
 
-        function injectDataEntriesLink() {
+        function removeIfNotNeeded() {
+          if (shouldShow()) return;
+          var existing = document.getElementById('nav-data-entries');
+          if (existing && existing.parentNode) {
+            existing.parentNode.removeChild(existing);
+          }
+        }
+
+        function findLogoutControl() {
+          // Prefer a visible button that says "Logout" (admin dashboard header)
+          var btns = document.querySelectorAll('button');
+          for (var i = 0; i < btns.length; i++) {
+            var b = btns[i];
+            var t = (b && b.textContent) ? String(b.textContent).replace(/\s+/g, ' ').trim().toLowerCase() : '';
+            if (t === 'logout') return b;
+          }
+
+          // Fallback to anchor
+          var links = document.querySelectorAll('a');
+          for (var j = 0; j < links.length; j++) {
+            var a = links[j];
+            var at = (a && a.textContent) ? String(a.textContent).replace(/\s+/g, ' ').trim().toLowerCase() : '';
+            if (at === 'logout') return a;
+          }
+
+          return null;
+        }
+
+        function injectNextToLogout() {
+          removeIfNotNeeded();
           if (!shouldShow()) return;
-          if (document.getElementById('nav-data-entries')) return;
 
-          var anchors = document.querySelectorAll('a');
-          var template = null;
-          for (var i = 0; i < anchors.length; i++) {
-            var a = anchors[i];
-            if (a && a.className && String(a.className).trim()) {
-              template = a;
-              break;
-            }
+          var logoutEl = findLogoutControl();
+          if (!logoutEl || !logoutEl.parentElement) return;
+
+          // If already injected and placed, do nothing.
+          var existing = document.getElementById('nav-data-entries');
+          if (existing && existing.parentElement === logoutEl.parentElement) return;
+
+          // Remove old fixed injected element (if any)
+          if (existing && existing.parentNode) {
+            existing.parentNode.removeChild(existing);
           }
 
-          var link = document.createElement('a');
-          link.id = 'nav-data-entries';
-          link.textContent = 'Data Entries';
-          link.setAttribute('href', '/data-entries.html');
-
-          if (template) {
-            link.className = template.className;
+          var entryEl;
+          try {
+            entryEl = logoutEl.cloneNode(true);
+          } catch (e) {
+            entryEl = document.createElement('button');
           }
 
-          // Minimal positioning so it doesn't get lost in the SPA layout.
-          link.style.position = 'fixed';
-          link.style.top = '14px';
-          link.style.right = '14px';
-          link.style.zIndex = '9999';
+          entryEl.id = 'nav-data-entries';
+          entryEl.textContent = 'Data Entries';
 
-          link.addEventListener('click', function (e) {
+          // Ensure it behaves like a button
+          if (String(entryEl.tagName || '').toLowerCase() === 'a') {
+            entryEl.setAttribute('href', '/data-entries.html');
+          } else {
+            entryEl.setAttribute('type', 'button');
+          }
+
+          // Small spacing if parent isn't using flex gap
+          entryEl.style.marginRight = '10px';
+
+          entryEl.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             window.location.href = '/data-entries.html';
           }, true);
 
-          document.body.appendChild(link);
+          logoutEl.parentElement.insertBefore(entryEl, logoutEl);
         }
 
-        injectDataEntriesLink();
+        function sync() {
+          // Keep consistent even on SPA route changes
+          injectNextToLogout();
+        }
+
+        sync();
+
         var mo = new MutationObserver(function () {
-          injectDataEntriesLink();
+          sync();
         });
         mo.observe(document.documentElement, { childList: true, subtree: true });
+
+        // Some SPA navigations change URL without DOM mutations.
+        setInterval(sync, 800);
       })();
     </script>
   </body>
