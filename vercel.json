@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/dashboard.html", "destination": "/dashboard.html" },
+    { "source": "/data-entries.html", "destination": "/data-entries.html" },
     { "source": "/founder.html", "destination": "/founder.html" },
     { "source": "/hr.html", "destination": "/hr.html" },
     { "source": "/employee.html", "destination": "/employee.html" },

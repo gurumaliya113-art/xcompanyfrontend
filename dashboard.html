@@ -114,6 +114,9 @@ async function login(){
   else if(emp.role === "HR"){
     window.location.href = "hr.html";
   }
+  else if(emp.role === "MANAGER" || emp.role === "DATA_ENTRY"){
+    window.location.href = "data-entries.html";
+  }
   else{
     window.location.href = "employee.html";
   }

@@ -134,5 +134,61 @@
         }
       })();
     </script>
+
+    <script>
+      (function () {
+        function shouldShow() {
+          try {
+            return String(window.location.pathname || '').toLowerCase().indexOf('/admin-login') === 0;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function injectDataEntriesLink() {
+          if (!shouldShow()) return;
+          if (document.getElementById('nav-data-entries')) return;
+
+          var anchors = document.querySelectorAll('a');
+          var template = null;
+          for (var i = 0; i < anchors.length; i++) {
+            var a = anchors[i];
+            if (a && a.className && String(a.className).trim()) {
+              template = a;
+              break;
+            }
+          }
+
+          var link = document.createElement('a');
+          link.id = 'nav-data-entries';
+          link.textContent = 'Data Entries';
+          link.setAttribute('href', '/data-entries.html');
+
+          if (template) {
+            link.className = template.className;
+          }
+
+          // Minimal positioning so it doesn't get lost in the SPA layout.
+          link.style.position = 'fixed';
+          link.style.top = '14px';
+          link.style.right = '14px';
+          link.style.zIndex = '9999';
+
+          link.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = '/data-entries.html';
+          }, true);
+
+          document.body.appendChild(link);
+        }
+
+        injectDataEntriesLink();
+        var mo = new MutationObserver(function () {
+          injectDataEntriesLink();
+        });
+        mo.observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>
   </body>
 </html>
