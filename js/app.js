@@ -1150,6 +1150,15 @@ function openMeeshoImage(url){
   window.open(u, "_blank", "noopener,noreferrer");
 }
 
+function openMeeshoBillPdf(url){
+  const u = (url || "").trim();
+  if(!u){
+    alert("No bill PDF found for this entry");
+    return;
+  }
+  window.open(u, "_blank", "noopener,noreferrer");
+}
+
 function _monthsElapsed(startDateStr){
   if(!startDateStr) return 0;
   const start = new Date(startDateStr);
@@ -1705,6 +1714,10 @@ async function showMeeshoEntries(){
               <div style="font-size:12px;opacity:.75;margin-bottom:6px">Image</div>
               <input id="me_img" type="file" accept="image/*" />
             </div>
+            <div>
+              <div style="font-size:12px;opacity:.75;margin-bottom:6px">Bill (PDF)</div>
+              <input id="me_pdf" type="file" accept="application/pdf,.pdf" />
+            </div>
           </div>
           <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
             <button onclick="addMeeshoEntry()">Add</button>
@@ -1748,6 +1761,27 @@ async function _uploadMeeshoImage(file, subOrderId){
   return url;
 }
 
+async function _uploadMeeshoBillPdf(file, subOrderId){
+  if(!file) return null;
+  const bucket = "meesho-entry-bills";
+  const safeSub = String(subOrderId || "order").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
+  const extRaw = (file.name && file.name.includes(".")) ? file.name.split(".").pop() : "pdf";
+  const ext = String(extRaw || "pdf").toLowerCase();
+  const path = `${safeSub}/${Date.now()}.${ext === "pdf" ? "pdf" : "pdf"}`;
+
+  const up = await sb.storage
+    .from(bucket)
+    .upload(path, file, { upsert: true, contentType: file.type || "application/pdf" });
+
+  if(up.error){
+    throw up.error;
+  }
+
+  const pub = sb.storage.from(bucket).getPublicUrl(path);
+  const url = pub?.data?.publicUrl || null;
+  return url;
+}
+
 async function loadMeeshoEntries(){
   const tableEl = document.getElementById("me_table");
   if(!tableEl) return;
@@ -1771,6 +1805,9 @@ async function loadMeeshoEntries(){
       const viewBtn = r.image_url
         ? `<button type="button" onclick='openMeeshoImage(${JSON.stringify(r.image_url)})'>View Image</button>`
         : `<span style="opacity:.7">No image</span>`;
+      const viewPdfBtn = r.bill_pdf_url
+        ? `<button type="button" onclick='openMeeshoBillPdf(${JSON.stringify(r.bill_pdf_url)})'>View Bill</button>`
+        : `<span style="opacity:.7">No bill</span>`;
       return `
         <tr>
           <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">
@@ -1795,6 +1832,12 @@ async function loadMeeshoEntries(){
               <input id="me_e_img" type="file" accept="image/*" />
             </div>
           </td>
+          <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${viewPdfBtn}
+              <input id="me_e_pdf" type="file" accept="application/pdf,.pdf" />
+            </div>
+          </td>
           <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08);white-space:nowrap">
             <button onclick="saveMeeshoEntry('${r.id}')">Save</button>
             <button style="margin-left:8px" onclick="cancelMeeshoEdit()">Cancel</button>
@@ -1805,6 +1848,10 @@ async function loadMeeshoEntries(){
 
     const imgCell = r.image_url
       ? `<button type="button" onclick='openMeeshoImage(${JSON.stringify(r.image_url)})'>View Image</button>`
+      : `<span style="opacity:.7">-</span>`;
+
+    const pdfCell = r.bill_pdf_url
+      ? `<button type="button" onclick='openMeeshoBillPdf(${JSON.stringify(r.bill_pdf_url)})'>View Bill</button>`
       : `<span style="opacity:.7">-</span>`;
 
     return `
@@ -1818,6 +1865,7 @@ async function loadMeeshoEntries(){
         <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">${r.return_status || "NONE"}</td>
         <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">${r.cancelled_by || "NONE"}</td>
         <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">${imgCell}</td>
+        <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08)">${pdfCell}</td>
         <td style="padding:8px;border-bottom:1px solid rgba(0,0,0,.08);white-space:nowrap">
           <button onclick="editMeeshoEntry('${r.id}')">Edit</button>
           <button style="background:#ef4444;margin-left:8px" onclick="deleteMeeshoEntry('${r.id}')">Delete</button>
@@ -1827,7 +1875,7 @@ async function loadMeeshoEntries(){
   }).join("");
 
   tableEl.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;min-width:1450px">
+    <table style="width:100%;border-collapse:collapse;min-width:1600px">
       <thead>
         <tr>
           <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">DATE & TIME</th>
@@ -1839,11 +1887,12 @@ async function loadMeeshoEntries(){
           <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">RETURN</th>
           <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">CANCELLED</th>
           <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">IMAGE</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">BILL (PDF)</th>
           <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.12)">ACTIONS</th>
         </tr>
       </thead>
       <tbody>
-        ${rowsHtml || `<tr><td colspan="10" style="padding:12px;opacity:.8">No entries yet</td></tr>`}
+        ${rowsHtml || `<tr><td colspan="11" style="padding:12px;opacity:.8">No entries yet</td></tr>`}
       </tbody>
     </table>
   `;
@@ -1872,6 +1921,7 @@ async function addMeeshoEntry(){
   const ret = (document.getElementById("me_return")?.value || "NONE").trim();
   const cancel = (document.getElementById("me_cancel")?.value || "NONE").trim();
   const imgFile = document.getElementById("me_img")?.files?.[0] || null;
+  const pdfFile = document.getElementById("me_pdf")?.files?.[0] || null;
 
   if(!sub){
     if(msgEl) msgEl.innerText = "Sub Order ID required";
@@ -1913,6 +1963,20 @@ async function addMeeshoEntry(){
     }
   }
 
+  if(pdfFile){
+    try {
+      if(msgEl) msgEl.innerText = "Uploading bill PDF...";
+      const url = await _uploadMeeshoBillPdf(pdfFile, sub);
+      if(url) payload.bill_pdf_url = url;
+    } catch (e) {
+      console.error(e);
+      const message = (e && e.message) ? e.message : "";
+      if(msgEl) msgEl.innerText = "Bill PDF upload failed. Run backend/sql/meesho_entry_bills_storage.sql and ensure bucket exists: meesho-entry-bills.";
+      alert("Bill PDF upload failed: " + message);
+      return;
+    }
+  }
+
   const { error } = await sb.from("meesho_entries").insert([payload]);
   if(error){
     console.error(error);
@@ -1929,6 +1993,8 @@ async function addMeeshoEntry(){
   if(sellEl) sellEl.value = "";
   const imgEl = document.getElementById("me_img");
   if(imgEl) imgEl.value = "";
+  const pdfEl = document.getElementById("me_pdf");
+  if(pdfEl) pdfEl.value = "";
   await loadMeeshoEntries();
 }
 
@@ -1944,6 +2010,7 @@ async function saveMeeshoEntry(id){
   const ret = (document.getElementById("me_e_ret")?.value || "NONE").trim();
   const cancel = (document.getElementById("me_e_can")?.value || "NONE").trim();
   const imgFile = document.getElementById("me_e_img")?.files?.[0] || null;
+  const pdfFile = document.getElementById("me_e_pdf")?.files?.[0] || null;
 
   if(!sub){
     alert("Sub Order ID required");
@@ -1980,6 +2047,18 @@ async function saveMeeshoEntry(id){
       console.error(e);
       const message = (e && e.message) ? e.message : "";
       alert("Image upload failed: " + message + "\n\nFix: Run backend/sql/meesho_entry_images_storage.sql and ensure bucket exists: meesho-entry-images");
+      return;
+    }
+  }
+
+  if(pdfFile){
+    try {
+      const url = await _uploadMeeshoBillPdf(pdfFile, sub);
+      if(url) payload.bill_pdf_url = url;
+    } catch (e) {
+      console.error(e);
+      const message = (e && e.message) ? e.message : "";
+      alert("Bill PDF upload failed: " + message + "\n\nFix: Run backend/sql/meesho_entry_bills_storage.sql and ensure bucket exists: meesho-entry-bills");
       return;
     }
   }
