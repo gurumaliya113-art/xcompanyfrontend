@@ -139,7 +139,11 @@
       (function () {
         function shouldShow() {
           try {
-            return String(window.location.pathname || '').toLowerCase().indexOf('/admin-login') === 0;
+            var p = String(window.location.pathname || '').toLowerCase();
+            return (
+              p === '/admin' || p.indexOf('/admin/') === 0 ||
+              p === '/admin-login' || p.indexOf('/admin-login') === 0
+            );
           } catch (e) {
             return false;
           }
