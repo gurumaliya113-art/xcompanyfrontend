@@ -2991,7 +2991,10 @@ async function saveDailyReport(businessId){
     const host = window.location.hostname;
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if(isLocal){
-      const resp = await fetch("http://localhost:3000/daily-report", {
+      const BACKEND = isLocal
+        ? 'http://localhost:3000'
+        : 'https://xcompanybackend-production.up.railway.app';
+      const resp = await fetch(BACKEND + "/daily-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
