@@ -1,0 +1,150 @@
+/* Modern Light / Premium Glass (scoped)
+   Apply by adding: <body class="x-theme"> */
+
+body.x-theme{
+  --slate-900:#0f172a;
+  --slate-800:#1e293b;
+  --slate-700:#334155;
+  --slate-600:#475569;
+  --slate-400:#94a3b8;
+  --slate-200:#e2e8f0;
+  --slate-100:#f1f5f9;
+  --white:#ffffff;
+  --sky-500:#0ea5e9;
+  --sky-300:#7dd3fc;
+  --sky-200:rgba(186,230,253,.60);
+  --indigo-500:#6366f1;
+  --indigo-200:rgba(199,210,254,.60);
+  --stone-50:#fafaf9;
+  --sky-50:#f0f9ff;
+  --danger:#dc2626;
+
+  min-height:100vh;
+  margin:0;
+  font-family:'Inter', Arial, sans-serif;
+  color:var(--slate-900);
+  background:linear-gradient(180deg, var(--sky-50) 0%, #ffffff 45%, var(--stone-50) 100%);
+  overflow-x:hidden;
+}
+
+body.x-theme::before,
+body.x-theme::after{
+  content:"";
+  position:fixed;
+  inset:auto;
+  width:520px;
+  height:520px;
+  border-radius:999px;
+  filter:blur(64px);
+  pointer-events:none;
+  z-index:-1;
+}
+
+body.x-theme::before{
+  top:-140px;
+  left:-120px;
+  background:var(--sky-200);
+}
+
+body.x-theme::after{
+  bottom:-180px;
+  right:-160px;
+  background:var(--indigo-200);
+}
+
+body.x-theme .x-container{
+  max-width:72rem;
+  margin:0 auto;
+  padding:0 1rem;
+}
+
+body.x-theme h1,
+body.x-theme h2,
+body.x-theme h3{
+  color:var(--slate-900);
+  letter-spacing:.2px;
+}
+
+body.x-theme .card,
+body.x-theme .login-popup{
+  background:rgba(255,255,255,.70);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border:1px solid var(--slate-200);
+  box-shadow:0 8px 32px rgba(2,6,23,.10);
+  border-radius:2rem;
+}
+
+body.x-theme input,
+body.x-theme textarea,
+body.x-theme select{
+  width:100%;
+  border-radius:1rem;
+  border:1px solid var(--slate-200);
+  background:rgba(255,255,255,.90);
+  color:var(--slate-900);
+  padding:0.85rem 1rem;
+  font-size:0.95rem;
+  box-shadow:0 1px 2px rgba(2,6,23,.06);
+  outline:none;
+}
+
+body.x-theme input::placeholder,
+body.x-theme textarea::placeholder{
+  color:var(--slate-400);
+}
+
+body.x-theme input:focus,
+body.x-theme textarea:focus,
+body.x-theme select:focus{
+  border-color:var(--sky-300);
+  box-shadow:0 0 0 4px rgba(125,211,252,.35);
+}
+
+/* Buttons: apply to main content, not sidebars */
+body.x-theme .main button,
+body.x-theme .card button,
+body.x-theme .login-popup button,
+body.x-theme #loginScreen button,
+body.x-theme #employeePanel button{
+  border:none;
+  border-radius:9999px;
+  background:var(--slate-900);
+  color:#fff;
+  padding:0.85rem 1.25rem;
+  font-size:0.95rem;
+  font-weight:700;
+  box-shadow:0 6px 18px rgba(2,6,23,.10);
+  cursor:pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+
+body.x-theme .main button:hover,
+body.x-theme .card button:hover,
+body.x-theme .login-popup button:hover,
+body.x-theme #loginScreen button:hover,
+body.x-theme #employeePanel button:hover{
+  background:var(--slate-800);
+  transform: translateY(-1px);
+}
+
+body.x-theme .muted{
+  color:var(--slate-600);
+}
+
+body.x-theme .pill{
+  display:inline-block;
+  border-radius:9999px;
+  border:1px solid var(--slate-200);
+  background:rgba(255,255,255,.70);
+  padding:.45rem .9rem;
+  font-size:.72rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--slate-700);
+}
+
+body.x-theme .danger{
+  color:var(--danger);
+}

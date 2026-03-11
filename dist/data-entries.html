@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Data Entries – The X Company</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{ margin:0; }
+    .topbar{
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 16px 18px;
+      background: rgba(255,255,255,0.75);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .topbar-title{ font-weight: 800; letter-spacing: .5px; }
+    .topbar-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .topbar-actions a{ text-decoration:none; }
+    #content{ width:100%; }
+  </style>
+</head>
+
+<body class="x-theme">
+  <div class="topbar">
+    <div class="topbar-title" id="title">Data Entries</div>
+    <div class="topbar-actions">
+      <a href="/admin-login">Admin</a>
+      <button id="logoutBtn" type="button">Logout</button>
+    </div>
+  </div>
+
+  <div id="content"></div>
+
+  <script>
+    const sb = supabase.createClient(
+      "https://ecjxynuccpncwsogezos.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
+    );
+
+    const title = document.getElementById("title");
+    const content = document.getElementById("content");
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await sb.auth.signOut();
+      window.location.href = "index.html";
+    });
+
+    window.addEventListener("load", async () => {
+      const { data } = await sb.auth.getUser();
+      if(!data || !data.user){
+        // Fallback to the classic login page (if used)
+        window.location.href = "dashboard.html";
+        return;
+      }
+
+      if(typeof showDataEntriesHome === "function"){
+        showDataEntriesHome();
+      }
+    });
+  </script>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

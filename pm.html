@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PM Panel – The X Company</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .wrap{ max-width: 1100px; margin: 0 auto; padding: 22px 14px; }
+    .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .muted{ opacity: .75; }
+    .grid{ display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top: 14px; }
+    .card{ flex: 1 1 380px; min-width: 300px; }
+    select, input{ width:100%; }
+  </style>
+</head>
+<body class="x-theme">
+
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 style="margin:0">PM Panel</h1>
+        <div class="muted" id="pmLabel">Primary Manager</div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button onclick="goBack()">← Back to Login</button>
+        <button onclick="logoutPM()" style="background:#ef4444">Logout</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3 style="margin-top:0;">Daily Entry</h3>
+        <label style="font-weight:600;display:block">Select Business</label>
+        <select id="bizSelect" style="margin-top:10px;padding:10px 12px;border-radius:10px;"></select>
+
+        <div style="margin-top:14px">
+          <label style="font-weight:600;display:block">Date</label>
+          <input id="rep_date" type="date">
+        </div>
+
+        <input id="rep_income" type="number" placeholder="Today Revenue (₹)" style="margin-top:12px">
+        <input id="rep_pool" type="number" placeholder="Money Taken from Pool (₹)" style="margin-top:12px">
+        <input id="rep_expense" type="number" placeholder="Today Expense (₹)" style="margin-top:12px">
+
+        <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
+          <input id="rep_profit" type="number" placeholder="Profit (₹)" disabled style="flex:1 1 180px; opacity:.85">
+          <input id="rep_loss" type="number" placeholder="Loss (₹)" disabled style="flex:1 1 180px; opacity:.85">
+        </div>
+
+        <button style="margin-top:14px" onclick="savePMDailyReport()">Save Entry</button>
+        <div id="msg" style="margin-top:12px;min-height:22px"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Instructions</h3>
+        <div class="muted">
+          Chef reports you daily numbers. You enter them here.
+          Founder/Admin can see aggregated performance in Portfolio.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const sb = supabase.createClient(
+    "https://ecjxynuccpncwsogezos.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
+  );
+
+  function setMsg(text, isErr){
+    const el = document.getElementById('msg');
+    if(!el) return;
+    el.innerText = text || '';
+    el.style.color = isErr ? '#dc2626' : '#16a34a';
+  }
+
+  function goBack(){
+    window.location.href = '/admin-login';
+  }
+
+  async function logoutPM(){
+    try { await sb.auth.signOut(); } catch(e) {}
+    window.location.href = '/admin-login';
+  }
+
+  function _recalcProfitLoss(){
+    const income = Number(document.getElementById('rep_income')?.value || 0);
+    const expense = Number(document.getElementById('rep_expense')?.value || 0);
+    const profit = income - expense;
+    const loss = profit < 0 ? Math.abs(profit) : 0;
+    const profitEl = document.getElementById('rep_profit');
+    const lossEl = document.getElementById('rep_loss');
+    if(profitEl) profitEl.value = profit > 0 ? profit : 0;
+    if(lossEl) lossEl.value = loss;
+  }
+
+  function _monthFromISODate(dateStr){
+    if(!dateStr || typeof dateStr !== 'string') return null;
+    const parts = dateStr.split('-');
+    if(parts.length < 2) return null;
+    const y = parts[0];
+    const m = parts[1];
+    if(!y || !m) return null;
+    return `${y}-${m}`;
+  }
+
+  async function loadBusinesses(){
+    let label = 'Primary Manager';
+    try {
+      const { data } = await sb.auth.getSession();
+      const email = data?.session?.user?.email;
+      if(email) label = email;
+    } catch(e) {}
+    const pmLabel = document.getElementById('pmLabel');
+    if(pmLabel) pmLabel.innerText = label;
+
+    const select = document.getElementById('bizSelect');
+    select.innerHTML = '<option value="">Loading...</option>';
+
+    const { data, error } = await sb.from('businesses').select('id,name,type');
+    if(error || !data){
+      select.innerHTML = '<option value="">Failed to load businesses</option>';
+      setMsg(error?.message || 'Failed to load businesses', true);
+      return;
+    }
+
+    const sorted = (data || []).slice().sort((a,b) => String(a.name||'').localeCompare(String(b.name||'')));
+    select.innerHTML = '<option value="">Select business</option>' +
+      sorted.map(b => `<option value="${b.id}">${b.name} (under ${b.type || 'category'})</option>`).join('');
+  }
+
+  async function savePMDailyReport(){
+    setMsg('');
+    const businessId = document.getElementById('bizSelect')?.value;
+    const date = document.getElementById('rep_date')?.value;
+    const income = Number(document.getElementById('rep_income')?.value || 0);
+    const poolTaken = Number(document.getElementById('rep_pool')?.value || 0);
+    const expense = Number(document.getElementById('rep_expense')?.value || 0);
+
+    if(!businessId){
+      setMsg('Select business', true);
+      return;
+    }
+    if(!date){
+      setMsg('Select date', true);
+      return;
+    }
+
+    const month = _monthFromISODate(date);
+    const profit = income - expense;
+
+    // 1) Try RPC (if exists)
+    try {
+      const { error } = await sb.rpc('save_daily_report_backend', {
+        p_business_id: businessId,
+        p_date: date,
+        p_income: income,
+        p_expense: expense,
+        p_pool_taken: poolTaken,
+      });
+      if(!error){
+        setMsg('Saved');
+        return;
+      }
+    } catch(e) {}
+
+    // 2) Try backend API when local
+    try {
+      const host = window.location.hostname;
+      const isLocal = host === 'localhost' || host === '127.0.0.1';
+      if(isLocal){
+        const resp = await fetch('http://localhost:3000/daily-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            date,
+            income,
+            expense,
+            pool_taken: poolTaken,
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if(resp.ok && json?.ok){
+          setMsg('Saved');
+          return;
+        }
+      }
+    } catch(e) {}
+
+    // 3) Direct insert fallback
+    const candidates = [
+      { business_id: businessId, report_date: date, month, income, expense, pool_taken: poolTaken, profit },
+      { business_id: businessId, month, income, expense, profit },
+      { business_id: businessId, income, expense },
+    ];
+
+    let lastErr = null;
+    for(const payload of candidates){
+      const { error } = await sb.from('reports').insert([payload]);
+      if(!error){
+        setMsg('Saved');
+        return;
+      }
+      lastErr = error;
+      if(/column .* does not exist|invalid input syntax|violates not-null constraint/i.test(error.message || '')){
+        continue;
+      }
+      break;
+    }
+
+    setMsg(lastErr?.message || 'Save failed', true);
+  }
+
+  // Guard: if PM not selected
+  (function(){
+    document.addEventListener('DOMContentLoaded', async function(){
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if(error || !data?.session){
+          window.location.href = '/admin-login';
+          return;
+        }
+      } catch(e) {
+        window.location.href = '/admin-login';
+        return;
+      }
+
+      document.getElementById('rep_income')?.addEventListener('input', _recalcProfitLoss);
+      document.getElementById('rep_expense')?.addEventListener('input', _recalcProfitLoss);
+      _recalcProfitLoss();
+      await loadBusinesses();
+    });
+  })();
+</script>
+
+</body>
+</html>

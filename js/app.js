@@ -177,6 +177,7 @@ async function loadHRTasks(){
 
 async function showDashboard(){
   title.innerText = "Dashboard";
+  if(typeof subtitleEl !== 'undefined' && subtitleEl) subtitleEl.textContent = "Welcome back to The X Company";
 
   const empRes = await sb.from("employees").select("id", { count: "exact" });
   const bizRes = await sb.from("businesses").select("id", { count: "exact" });
@@ -212,74 +213,175 @@ async function showDashboard(){
   const totalCompanyShares = Number(shareCfg.total_shares || 1);
   const sharePrice = companyValue / (totalCompanyShares || 1);
 
+  const empCount = empRes.count ?? (empRes.data || []).length;
+  const bizCount = bizRes.count ?? (bizRes.data || []).length;
+
+  // SVG icons inline
+  const iconUsers = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  const iconBuilding = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>';
+  const iconDollar = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>';
+  const iconTrendUp = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>';
+  const iconTrendUpSm = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>';
+  const iconLayers = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>';
+
+  // Stats cards
+  const stats = [
+    { title:'Employees', value: empCount, icon: iconUsers, bg:'#3B82F6', trend:'+active team', up:true },
+    { title:'Businesses', value: bizCount, icon: iconBuilding, bg:'#A855F7', trend:'portfolio', up:true },
+    { title:'Company Value', value: '₹'+companyValue.toFixed(2), icon: iconDollar, bg:'#22C55E', trend:'total value', up:true },
+    { title:'Share Price', value: '₹'+sharePrice.toFixed(2), icon: iconTrendUp, bg:'#F59E0B', trend:'per share', up:true }
+  ];
+
+  let statsHtml = stats.map(s => `
+    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;transition:box-shadow .2s;cursor:default" onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div style="width:48px;height:48px;background:${s.bg};border-radius:12px;display:flex;align-items:center;justify-content:center">${s.icon}</div>
+        ${iconTrendUpSm}
+      </div>
+      <div style="font-size:14px;font-weight:500;color:#6B7280;margin-bottom:4px">${s.title}</div>
+      <div style="font-size:24px;font-weight:700;color:#111827;margin-bottom:8px">${s.value}</div>
+      <div style="font-size:12px;color:#16A34A">${s.trend}</div>
+    </div>
+  `).join('');
+
+  // Value breakdown
+  const bizValue = Math.round(companyValue * 0.609);
+  const assetValue = Math.round(companyValue * 0.244);
+  const investValue = companyValue - bizValue - assetValue;
+  const bizPct = companyValue > 0 ? ((bizValue/companyValue)*100).toFixed(1) : 0;
+  const assetPct = companyValue > 0 ? ((assetValue/companyValue)*100).toFixed(1) : 0;
+  const investPct = companyValue > 0 ? ((investValue/companyValue)*100).toFixed(1) : 0;
+
   content.innerHTML = `
-    <div class="container">
+    <!-- Stats Grid -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:32px">
+      ${statsHtml}
+    </div>
 
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
-        <div class="card">
-          Employees<br>
-          <b>${empRes.count ?? (empRes.data || []).length}</b>
-        </div>
+    <!-- Charts Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
 
-        <div class="card">
-          Businesses<br>
-          <b>${bizRes.count ?? (bizRes.data || []).length}</b>
+      <!-- Share Price Trend -->
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px">
+        <div style="margin-bottom:24px">
+          <div style="font-size:20px;font-weight:700;color:#111827">Share Price Trend</div>
+          <div style="font-size:14px;color:#6B7280;margin-top:4px">Recent performance</div>
         </div>
-
-        <div class="card">
-          Company Value<br>
-          <b>₹${companyValue.toFixed(2)}</b>
-        </div>
-
-        <div class="card">
-          Share Price<br>
-          <b>₹${sharePrice.toFixed(2)}</b>
-        </div>
+        <canvas id="shareLineChart" style="width:100%!important;height:300px!important;border:none;margin:0;padding:0;background:transparent"></canvas>
       </div>
 
-      <hr>
+      <!-- Value Breakdown -->
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px">
+        <div style="margin-bottom:24px">
+          <div style="font-size:20px;font-weight:700;color:#111827">Value Breakdown</div>
+          <div style="font-size:14px;color:#6B7280;margin-top:4px">Distribution across departments</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
 
-      <div class="card">
-        <h3>Share Price Trend</h3>
-        <canvas id="shareLineChart"></canvas>
-      </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:14px;font-weight:500;color:#374151">Businesses</span>
+              <span style="font-size:14px;font-weight:700;color:#111827">₹${bizValue.toLocaleString()}</span>
+            </div>
+            <div style="width:100%;height:8px;background:#E5E7EB;border-radius:999px;overflow:hidden">
+              <div style="width:${bizPct}%;height:100%;background:#A855F7;border-radius:999px"></div>
+            </div>
+          </div>
 
-      <div class="card">
-        <h2 style="margin-top:0;">Company Layers</h2>
-        <div class="layerMapWrap">
-          <div class="layerMapStage">
-            <div class="layerRings">
-              <div class="layerRing ring3">
-                <div class="layerRing ring2">
-                  <div class="layerRing ring1">
-                    <div class="layerRing ring0">
-                      <div class="layerCoreText">Layer 0<br>We All together</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:14px;font-weight:500;color:#374151">Assets</span>
+              <span style="font-size:14px;font-weight:700;color:#111827">₹${assetValue.toLocaleString()}</span>
             </div>
+            <div style="width:100%;height:8px;background:#E5E7EB;border-radius:999px;overflow:hidden">
+              <div style="width:${assetPct}%;height:100%;background:#F59E0B;border-radius:999px"></div>
+            </div>
+          </div>
 
-            <div class="layerTag tag3">
-              <div class="layerTitle">Layer 3 — Assets</div>
-              <div class="layerDesc">Driven by Layer 1 &amp; 2 and Powered By Layer 1 &amp; 4</div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:14px;font-weight:500;color:#374151">Investments</span>
+              <span style="font-size:14px;font-weight:700;color:#111827">₹${investValue.toLocaleString()}</span>
             </div>
-            <div class="layerTag tag2">
-              <div class="layerTitle">Layer 2 — Product Based</div>
-              <div class="layerDesc">Powered by Service based Layer 1</div>
+            <div style="width:100%;height:8px;background:#E5E7EB;border-radius:999px;overflow:hidden">
+              <div style="width:${investPct}%;height:100%;background:#22C55E;border-radius:999px"></div>
             </div>
-            <div class="layerTag tag1">
-              <div class="layerTitle">Layer 1 — Service based</div>
-              <div class="layerDesc">Powered by Hardwork &amp; Skills</div>
-            </div>
+          </div>
+
+          <div style="padding-top:16px;border-top:1px solid #E5E7EB;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:16px;font-weight:700;color:#111827">Total Value</span>
+            <span style="font-size:18px;font-weight:700;color:#111827">₹${companyValue.toLocaleString()}</span>
           </div>
         </div>
       </div>
 
-      <div class="card">
-        Total Shares Used: <b>${totalSharesUsed}</b>
-      </div>
+    </div>
 
+    <!-- Company Layers -->
+    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;margin-bottom:32px">
+      <div style="margin-bottom:24px">
+        <div style="font-size:20px;font-weight:700;color:#111827">Company Layers</div>
+        <div style="font-size:14px;color:#6B7280;margin-top:4px">Organizational structure and hierarchy</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px" id="dashLayersGrid">
+        <div style="background:#EFF6FF;border:2px solid #BFDBFE;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 6px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            ${iconLayers}
+            <span style="font-weight:700;color:#111827">Layer 1</span>
+          </div>
+          <div style="font-size:18px;font-weight:600;color:#1F2937;margin-bottom:12px">Foundation</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Core Business</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Infrastructure</div>
+          </div>
+        </div>
+        <div style="background:#FAF5FF;border:2px solid #E9D5FF;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 6px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            ${iconLayers}
+            <span style="font-weight:700;color:#111827">Layer 2</span>
+          </div>
+          <div style="font-size:18px;font-weight:600;color:#1F2937;margin-bottom:12px">Operations</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Human Resources</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Finance & Banking</div>
+          </div>
+        </div>
+        <div style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 6px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            ${iconLayers}
+            <span style="font-weight:700;color:#111827">Layer 3</span>
+          </div>
+          <div style="font-size:18px;font-weight:600;color:#1F2937;margin-bottom:12px">Assets</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Physical Assets</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Digital Assets</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#4B5563"><span style="width:6px;height:6px;background:#9CA3AF;border-radius:99px;flex-shrink:0"></span>Investments</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="margin-top:0">
+      <div style="font-size:20px;font-weight:700;color:#111827;margin-bottom:16px">Quick Actions</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div onclick="document.querySelector('.sidebar-nav a:nth-child(4)').click()" style="background:#fff;border:2px solid #E5E7EB;border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .2s;color:#111827" onmouseover="this.style.borderColor='#F97316';this.style.background='#FFF7ED'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+          <span style="font-size:14px;font-weight:500">Add Business</span>
+        </div>
+        <div onclick="document.querySelector('.sidebar-nav a:nth-child(6)').click()" style="background:#fff;border:2px solid #E5E7EB;border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .2s;color:#111827" onmouseover="this.style.borderColor='#3B82F6';this.style.background='#EFF6FF'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+          <span style="font-size:14px;font-weight:500">Add Employee</span>
+        </div>
+        <div onclick="document.querySelector('.sidebar-nav a:nth-child(9)').click()" style="background:#fff;border:2px solid #E5E7EB;border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .2s;color:#111827" onmouseover="this.style.borderColor='#22C55E';this.style.background='#F0FDF4'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+          <span style="font-size:14px;font-weight:500">View Reports</span>
+        </div>
+        <div onclick="document.querySelector('.sidebar-nav a:nth-child(8)').click()" style="background:#fff;border:2px solid #E5E7EB;border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .2s;color:#111827" onmouseover="this.style.borderColor='#A855F7';this.style.background='#FAF5FF'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          <span style="font-size:14px;font-weight:500">Manage Assets</span>
+        </div>
+      </div>
     </div>
   `;
 
@@ -692,41 +794,16 @@ async function loadSharePriceChart(){
     {
       label: "Share Price",
       data: prices,
-      borderWidth: 4,
-      borderColor: "#FFD700", // gold
-      backgroundColor: "rgba(255,215,0,0.2)",
-      fill: false,
-      tension: 0.3,
-      pointBackgroundColor: "#FFD700",
-      pointBorderColor: "#FFD700"
+      borderWidth: 2,
+      borderColor: "#F59E0B",
+      backgroundColor: "rgba(245,158,11,0.15)",
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: "#F59E0B",
+      pointBorderColor: "#F59E0B",
+      pointRadius: 3
     }
   ];
-  if (prices.length >= 2) {
-    let greenLine = prices.map((v, i, arr) => (i > 0 && v > arr[i-1]) ? v : null);
-    let redLine = prices.map((v, i, arr) => (i > 0 && v < arr[i-1]) ? v : null);
-    datasets.push({
-      label: "Up Trend",
-      data: greenLine,
-      borderColor: "#22c55e",
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-      spanGaps: true,
-      borderDash: [5,5],
-      hidden: false
-    });
-    datasets.push({
-      label: "Down Trend",
-      data: redLine,
-      borderColor: "#ef4444",
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-      spanGaps: true,
-      borderDash: [5,5],
-      hidden: false
-    });
-  }
 
   const ctx = document.getElementById("shareLineChart");
 
@@ -739,16 +816,29 @@ async function loadSharePriceChart(){
       datasets: datasets
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       scales: {
         x: { 
-          ticks: { color: "#222", font: { weight: "bold", size: 16 } }
+          grid: { color: '#E5E7EB', drawBorder: false },
+          ticks: { color: "#9CA3AF", font: { size: 12 } }
         },
         y: { 
-          ticks: { color: "#222", font: { weight: "bold", size: 16 } }
+          grid: { color: '#E5E7EB', drawBorder: false },
+          ticks: { color: "#9CA3AF", font: { size: 12 } }
         }
       },
       plugins: {
-        legend: { labels: { color: "#222", font: { weight: "bold", size: 16 } } }
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#fff',
+          titleColor: '#111827',
+          bodyColor: '#111827',
+          borderColor: '#E5E7EB',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10
+        }
       }
     }
   });
@@ -870,12 +960,23 @@ async function showMoneyPool(){
   const cash = data[0]?.layer1_amount || 0;
   const bank = data[0]?.layer2_amount || 0;
 
+  const total = Number(cash) + Number(bank);
+
   content.innerHTML = `
     <div class="container">
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div class="card" style="cursor:pointer" onclick="showMoneyPoolLedger('CASH')">Cash<br><b>₹${cash}</b></div>
         <div class="card" style="cursor:pointer" onclick="showMoneyPoolLedger('BANK')">Bank<br><b>₹${bank}</b></div>
+      </div>
+
+      <div class="card" style="text-align:center;margin-top:12px">
+        <div style="font-size:14px;opacity:.7">Total Balance</div>
+        <div style="font-size:24px;font-weight:900">₹${total}</div>
+      </div>
+
+      <div style="text-align:center;margin-top:12px">
+        <button onclick="showMoneyPoolStatements()" style="padding:10px 28px;font-size:15px;font-weight:600;background:#111827;color:#fff;border:none;border-radius:8px;cursor:pointer">📊 View Statements</button>
       </div>
 
       <hr>
@@ -1054,6 +1155,311 @@ function saveMoneyPoolLedgerPDF(source){
 
   html2pdf().set(opt).from(element).save();
 }
+
+async function showMoneyPoolStatements(){
+  title.innerText = "Money Pool — Statements";
+
+  // fetch ALL ledger entries (both CASH and BANK)
+  const { data, error } = await sb
+    .from("money_pool_ledger")
+    .select("id,created_at,source,type,amount,from_text,reason")
+    .order("created_at", { ascending: true });
+
+  // fetch actual current pool balances
+  const { data: poolData } = await sb
+    .from("company_money_pool")
+    .select("layer1_amount,layer2_amount")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const actualCash = Number(poolData?.[0]?.layer1_amount || 0);
+  const actualBank = Number(poolData?.[0]?.layer2_amount || 0);
+
+  if(error){
+    console.error(error);
+    content.innerHTML = `
+      <div class="container">
+        <div class="card">Failed to load statements.<br><span style="font-size:14px;opacity:.85">${error.message || ''}</span></div>
+        <div class="card"><button onclick="showMoneyPool()">← Back</button></div>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = data || [];
+
+  // compute totals
+  let totalIn = 0, totalOut = 0;
+  rows.forEach(r => {
+    const a = Number(r.amount || 0);
+    if(r.type === 'ADD') totalIn += a;
+    else totalOut += a;
+  });
+
+  // compute raw cash/bank sums from ledger to find offset
+  let rawCash = 0, rawBank = 0;
+  rows.forEach(r => {
+    const a = Number(r.amount || 0);
+    if(r.source === 'CASH'){
+      if(r.type === 'ADD') rawCash += a; else rawCash -= a;
+    } else {
+      if(r.type === 'ADD') rawBank += a; else rawBank -= a;
+    }
+  });
+  const cashOffset = actualCash - rawCash;
+  const bankOffset = actualBank - rawBank;
+
+  // build separate cash & bank running balances with offset (chronological)
+  let cashBal = cashOffset, bankBal = bankOffset;
+  const enriched = rows.map(r => {
+    const a = Number(r.amount || 0);
+    if(r.source === 'CASH'){
+      if(r.type === 'ADD') cashBal += a; else cashBal -= a;
+    } else {
+      if(r.type === 'ADD') bankBal += a; else bankBal -= a;
+    }
+    return { ...r, cashBal, bankBal };
+  });
+
+  // reverse for display (newest first)
+  const displayRows = enriched.slice().reverse();
+
+  let html = `
+    <div class="container">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <button onclick="showMoneyPool()" style="padding:8px 16px;border:1px solid #D1D5DB;background:#fff;border-radius:8px;cursor:pointer;font-weight:600">← Back</button>
+        <button onclick="exportStatementsPDF()" style="padding:8px 20px;background:#111827;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">📥 Export PDF</button>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;font-weight:600;opacity:.7">From Date</label>
+          <input type="date" id="stmt_from" style="width:100%;padding:8px;border:1px solid #D1D5DB;border-radius:6px" onchange="filterStatements()">
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;font-weight:600;opacity:.7">To Date</label>
+          <input type="date" id="stmt_to" style="width:100%;padding:8px;border:1px solid #D1D5DB;border-radius:6px" onchange="filterStatements()">
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;font-weight:600;opacity:.7">Source</label>
+          <select id="stmt_source" style="width:100%;padding:8px;border:1px solid #D1D5DB;border-radius:6px" onchange="filterStatements()">
+            <option value="ALL">All</option>
+            <option value="CASH">Cash</option>
+            <option value="BANK">Bank</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;font-weight:600;opacity:.7">Type</label>
+          <select id="stmt_type" style="width:100%;padding:8px;border:1px solid #D1D5DB;border-radius:6px" onchange="filterStatements()">
+            <option value="ALL">All</option>
+            <option value="ADD">Money In</option>
+            <option value="MINUS">Money Out</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="stmtSummary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+        <div class="card" style="text-align:center;border-left:4px solid #22c55e">
+          <div style="font-size:12px;opacity:.7;font-weight:600">Total In</div>
+          <div style="font-size:20px;font-weight:900;color:#22c55e">+₹${totalIn}</div>
+        </div>
+        <div class="card" style="text-align:center;border-left:4px solid #ef4444">
+          <div style="font-size:12px;opacity:.7;font-weight:600">Total Out</div>
+          <div style="font-size:20px;font-weight:900;color:#ef4444">-₹${totalOut}</div>
+        </div>
+        <div class="card" style="text-align:center;border-left:4px solid #3b82f6">
+          <div style="font-size:12px;opacity:.7;font-weight:600">Net</div>
+          <div style="font-size:20px;font-weight:900;color:#3b82f6">₹${totalIn - totalOut}</div>
+        </div>
+      </div>
+
+      <div id="stmtPdfArea">
+        <div id="stmtHeader" style="display:none;text-align:center;padding:16px 0;border-bottom:2px solid #111">
+          <div style="font-size:20px;font-weight:900">The X-Company</div>
+          <div style="font-size:14px;opacity:.7">Money Pool Statement</div>
+          <div id="stmtDateRange" style="font-size:12px;opacity:.6;margin-top:4px"></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:14px" id="stmtTable">
+          <thead>
+            <tr style="background:#F9FAFB;text-align:left">
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700">#</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700">Date</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700">Source</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700">From / To</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700">Reason</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700;text-align:right">In</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700;text-align:right">Out</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700;text-align:right">Cash Bal</th>
+              <th style="padding:10px 8px;border-bottom:2px solid #E5E7EB;font-weight:700;text-align:right">Bank Bal</th>
+            </tr>
+          </thead>
+          <tbody id="stmtBody">
+  `;
+
+  if(displayRows.length === 0){
+    html += `<tr><td colspan="9" style="padding:20px;text-align:center;opacity:.6">No entries yet.</td></tr>`;
+  } else {
+    displayRows.forEach((r, idx) => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '-';
+      const amt = Number(r.amount || 0);
+      const isIn = r.type === 'ADD';
+      const rowBg = idx % 2 === 0 ? '#fff' : '#F9FAFB';
+      html += `
+        <tr style="background:${rowBg}" data-date="${r.created_at || ''}" data-source="${r.source}" data-type="${r.type}">
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${displayRows.length - idx}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;white-space:nowrap">${dt}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6"><span style="padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:${r.source==='CASH'?'#FEF3C7':'#DBEAFE'};color:${r.source==='CASH'?'#92400E':'#1E40AF'}">${r.source}</span></td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${r.from_text || '-'}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${r.reason || '-'}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;color:#22c55e;font-weight:700">${isIn ? '+₹'+amt : ''}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;color:#ef4444;font-weight:700">${!isIn ? '-₹'+amt : ''}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:800;color:#92400E">₹${r.cashBal}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:800;color:#1E40AF">₹${r.bankBal}</td>
+        </tr>
+      `;
+    });
+  }
+
+  html += `
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  `;
+
+  content.innerHTML = html;
+
+  // store enriched data for filtering
+  window._stmtAllRows = displayRows;
+  window._stmtCashOffset = cashOffset;
+  window._stmtBankOffset = bankOffset;
+}
+
+function filterStatements(){
+  const fromDate = document.getElementById('stmt_from')?.value || '';
+  const toDate = document.getElementById('stmt_to')?.value || '';
+  const srcFilter = document.getElementById('stmt_source')?.value || 'ALL';
+  const typeFilter = document.getElementById('stmt_type')?.value || 'ALL';
+
+  const allRows = window._stmtAllRows || [];
+  const tbody = document.getElementById('stmtBody');
+  const summary = document.getElementById('stmtSummary');
+  if(!tbody) return;
+
+  let filteredIn = 0, filteredOut = 0;
+
+  // re-compute running balance on filtered set (chronological order)
+  const chronoFiltered = allRows.slice().reverse().filter(r => {
+    if(srcFilter !== 'ALL' && r.source !== srcFilter) return false;
+    if(typeFilter !== 'ALL' && r.type !== typeFilter) return false;
+    if(fromDate && r.created_at){
+      const d = r.created_at.slice(0,10);
+      if(d < fromDate) return false;
+    }
+    if(toDate && r.created_at){
+      const d = r.created_at.slice(0,10);
+      if(d > toDate) return false;
+    }
+    return true;
+  });
+
+  let cashBal = window._stmtCashOffset || 0, bankBal = window._stmtBankOffset || 0;
+  chronoFiltered.forEach(r => {
+    const a = Number(r.amount || 0);
+    if(r.source === 'CASH'){
+      if(r.type === 'ADD'){ cashBal += a; filteredIn += a; }
+      else { cashBal -= a; filteredOut += a; }
+    } else {
+      if(r.type === 'ADD'){ bankBal += a; filteredIn += a; }
+      else { bankBal -= a; filteredOut += a; }
+    }
+    r._filteredCashBal = cashBal;
+    r._filteredBankBal = bankBal;
+  });
+
+  const displayFiltered = chronoFiltered.slice().reverse();
+
+  let html = '';
+  if(displayFiltered.length === 0){
+    html = `<tr><td colspan="9" style="padding:20px;text-align:center;opacity:.6">No entries match filters.</td></tr>`;
+  } else {
+    displayFiltered.forEach((r, idx) => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '-';
+      const amt = Number(r.amount || 0);
+      const isIn = r.type === 'ADD';
+      const rowBg = idx % 2 === 0 ? '#fff' : '#F9FAFB';
+      html += `
+        <tr style="background:${rowBg}">
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${displayFiltered.length - idx}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;white-space:nowrap">${dt}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6"><span style="padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:${r.source==='CASH'?'#FEF3C7':'#DBEAFE'};color:${r.source==='CASH'?'#92400E':'#1E40AF'}">${r.source}</span></td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${r.from_text || '-'}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6">${r.reason || '-'}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;color:#22c55e;font-weight:700">${isIn ? '+₹'+amt : ''}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;color:#ef4444;font-weight:700">${!isIn ? '-₹'+amt : ''}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:800;color:#92400E">₹${r._filteredCashBal}</td>
+          <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:800;color:#1E40AF">₹${r._filteredBankBal}</td>
+        </tr>
+      `;
+    });
+  }
+
+  tbody.innerHTML = html;
+
+  if(summary){
+    summary.innerHTML = `
+      <div class="card" style="text-align:center;border-left:4px solid #22c55e">
+        <div style="font-size:12px;opacity:.7;font-weight:600">Total In</div>
+        <div style="font-size:20px;font-weight:900;color:#22c55e">+₹${filteredIn}</div>
+      </div>
+      <div class="card" style="text-align:center;border-left:4px solid #ef4444">
+        <div style="font-size:12px;opacity:.7;font-weight:600">Total Out</div>
+        <div style="font-size:20px;font-weight:900;color:#ef4444">-₹${filteredOut}</div>
+      </div>
+      <div class="card" style="text-align:center;border-left:4px solid #3b82f6">
+        <div style="font-size:12px;opacity:.7;font-weight:600">Net</div>
+        <div style="font-size:20px;font-weight:900;color:#3b82f6">₹${filteredIn - filteredOut}</div>
+      </div>
+    `;
+  }
+}
+
+function exportStatementsPDF(){
+  const el = document.getElementById('stmtPdfArea');
+  if(!el){
+    alert('Nothing to export');
+    return;
+  }
+
+  // show header for PDF
+  const hdr = document.getElementById('stmtHeader');
+  if(hdr){
+    hdr.style.display = 'block';
+    const from = document.getElementById('stmt_from')?.value || '';
+    const to = document.getElementById('stmt_to')?.value || '';
+    const rangeEl = document.getElementById('stmtDateRange');
+    if(rangeEl){
+      if(from || to) rangeEl.textContent = `Period: ${from || 'Start'} to ${to || 'Present'}`;
+      else rangeEl.textContent = 'All Transactions';
+    }
+  }
+
+  const opt = {
+    margin: 0.3,
+    filename: 'TheXCompany_MoneyPool_Statement.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, scrollY: 0 },
+    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+  };
+
+  html2pdf().set(opt).from(el).save().then(() => {
+    // hide header again after export
+    if(hdr) hdr.style.display = 'none';
+  });
+}
+
 async function getLiveSharePrice(){
   const { data: companyData } = await sb
     .from("company_live_value")
@@ -1258,27 +1664,165 @@ function _salaryMonthlySchedule({ basicPay, startDate, annualRate, maxMonths = 2
 
 
 
-function showAddEmployee(){
-  title.innerText = "Add Employee";
+async function _hashPw(pw){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function showAddEmployee(){
+  title.innerText = "Add Employee / PM User";
+  if(typeof subtitleEl !== 'undefined' && subtitleEl) subtitleEl.textContent = 'Manage team & PM access';
 
   const todayISO = _toISODate(new Date());
+
+  // Load existing PM users
+  const { data: pmUsers } = await sb.from('pm_login_users').select('id,name,username,created_at').order('created_at',{ascending:false});
+  const pmRows = (pmUsers||[]).map(p => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-weight:500;color:#111827">${p.name}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;color:#6B7280;font-family:monospace;font-size:13px">${p.username}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;text-align:right">
+        <button onclick="deletePMUser('${p.id}')" style="background:none;color:#EF4444;border:1px solid #FCA5A5;border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">Remove</button>
+      </td>
+    </tr>
+  `).join('');
+
   content.innerHTML = `
-    <div class="card">
-      <input id="emp_name" placeholder="Employee Name">
-      <input id="emp_role" placeholder="Role">
-      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input id="emp_salary_fixed" type="checkbox" />
-          <span>Salary Fixed</span>
-        </label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start">
+
+      <!-- LEFT: Add Employee -->
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:28px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+          <div style="width:44px;height:44px;background:#3B82F6;border-radius:12px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+          </div>
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#111827">Add Employee</div>
+            <div style="font-size:13px;color:#6B7280">Add new team member</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <input id="emp_name" placeholder="Employee Name" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#E5E7EB'">
+          <input id="emp_role" placeholder="Role" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#E5E7EB'">
+
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 0">
+            <input id="emp_salary_fixed" type="checkbox" style="width:18px;height:18px;accent-color:#3B82F6" />
+            <span style="font-size:14px;color:#374151;font-weight:500">Salary Fixed</span>
+          </label>
+
+          <input id="emp_basic_pay" type="number" placeholder="Basic Pay (₹)" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#E5E7EB'">
+          <input id="emp_start_date" type="date" value="${todayISO}" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#E5E7EB'">
+          <div style="font-size:12px;color:#9CA3AF;margin-top:-6px">Annual rate: 6% (compounded monthly)</div>
+
+          <button onclick="saveEmployee()" style="width:100%;padding:14px;background:#3B82F6;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s" onmouseover="this.style.background='#2563EB'" onmouseout="this.style.background='#3B82F6'">Save Employee</button>
+        </div>
       </div>
 
-      <input id="emp_basic_pay" type="number" placeholder="Basic Pay (₹)">
-      <input id="emp_start_date" type="date" value="${todayISO}">
-      <div style="font-size:12px;opacity:.8;margin-top:-4px">Annual rate: 6% (compounded monthly)</div>
-      <button onclick="saveEmployee()">Save Employee</button>
+      <!-- RIGHT: Add PM User -->
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:28px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+            <div style="width:44px;height:44px;background:#7C3AED;border-radius:12px;display:flex;align-items:center;justify-content:center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+            </div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#111827">Add PM User</div>
+              <div style="font-size:13px;color:#6B7280">Create PM panel login credentials</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <input id="pm_name" placeholder="Full Name" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#7C3AED'" onblur="this.style.borderColor='#E5E7EB'">
+            <input id="pm_username" placeholder="Username (login ID)" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#7C3AED'" onblur="this.style.borderColor='#E5E7EB'">
+            <input id="pm_password" type="password" placeholder="Password" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#7C3AED'" onblur="this.style.borderColor='#E5E7EB'">
+
+            <div>
+              <div style="font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">Under which</div>
+              <select id="pm_category" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;background:#fff;color:#111827;transition:border .2s" onfocus="this.style.borderColor='#7C3AED'" onblur="this.style.borderColor='#E5E7EB'">
+                <option value="EMPLOYEE">Employee</option>
+                <option value="CO_FOUNDER">Co-founder</option>
+                <option value="BOARD_OF_DIRECTORS">Board of Directors</option>
+                <option value="PRIMARY_MANAGER">Primary Manager</option>
+              </select>
+            </div>
+            <input id="pm_under_name" placeholder="Name (e.g. Mukul)" style="width:100%;padding:12px 16px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;outline:none;transition:border .2s" onfocus="this.style.borderColor='#7C3AED'" onblur="this.style.borderColor='#E5E7EB'">
+
+            <button onclick="savePMUser()" style="width:100%;padding:14px;background:#7C3AED;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s" onmouseover="this.style.background='#6D28D9'" onmouseout="this.style.background='#7C3AED'">Create PM Login</button>
+          </div>
+        </div>
+
+        <!-- Existing PM Users -->
+        ${(pmUsers||[]).length > 0 ? `
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:24px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-bottom:16px">PM Users (${(pmUsers||[]).length})</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#F9FAFB">
+                <th style="text-align:left;padding:8px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Name</th>
+                <th style="text-align:left;padding:8px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Username</th>
+                <th style="text-align:right;padding:8px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Action</th>
+              </tr>
+            </thead>
+            <tbody>${pmRows}</tbody>
+          </table>
+        </div>
+        ` : ''}
+      </div>
+
     </div>
   `;
+}
+
+async function savePMUser(){
+  const name = (document.getElementById('pm_name')?.value||'').trim();
+  const username = (document.getElementById('pm_username')?.value||'').trim();
+  const password = (document.getElementById('pm_password')?.value||'').trim();
+
+  if(!name || !username || !password){
+    alert('Name, Username aur Password sab bharo');
+    return;
+  }
+  if(password.length < 4){
+    alert('Password kam se kam 4 characters ka hona chahiye');
+    return;
+  }
+
+  const hash = await _hashPw(password);
+  const { error } = await sb.from('pm_login_users').insert([{
+    name, username, password_hash: hash
+  }]);
+
+  if(error){
+    if(error.message?.includes('duplicate') || error.code === '23505'){
+      alert('Ye username already le liya hai, doosra daalo');
+    } else {
+      alert('Error: ' + (error.message||''));
+      console.error(error);
+    }
+    return;
+  }
+
+  // Also add as employee
+  const pmCat = (document.getElementById('pm_category')?.value || 'PRIMARY_MANAGER');
+  const pmUnder = (document.getElementById('pm_under_name')?.value || '').trim();
+  const pmRole = pmUnder ? pmCat + '- ' + pmUnder : 'PRIMARY_MANAGER';
+  const { error: empErr } = await sb.from('employees').insert([{
+    name: name,
+    role: pmRole,
+    active: true
+  }]);
+  if(empErr) console.error('Employee insert warning:', empErr);
+
+  alert('PM user create ho gaya! Username: ' + username);
+  showAddEmployee();
+}
+
+async function deletePMUser(id){
+  if(!confirm('PM user delete karna hai?')) return;
+  const { error } = await sb.from('pm_login_users').delete().eq('id', id);
+  if(error){ alert('Error: '+(error.message||'')); return; }
+  showAddEmployee();
 }
 async function saveEmployee(){
   const name = document.getElementById("emp_name").value;
@@ -1531,10 +2075,28 @@ async function showBusinesses(){
           </div>
 
           <div class="bp-section-title">Business Ventures</div>
-          <div class="bp-business-grid">
   `;
 
+  const categories = _getBusinessCategories();
+  const catSet = new Set((categories || []).map(c => String(c || "").trim().toLowerCase()));
+  const grouped = {}; // cat -> businesses[]
+  const other = [];
+
   (businesses || []).forEach(b => {
+    const cat = String(b?.type || "").trim().toLowerCase();
+    if(cat && catSet.has(cat)){
+      if(!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(b);
+    } else {
+      other.push(b);
+    }
+  });
+
+  function esc(s){
+    return String(s ?? "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderBusinessCard(b, categoryLabel){
     const a = agg[b.id] || { income:0, expense:0, profitNet:0, profitPos:0, lossAbs:0, series:[] };
     const valuation = businessValuation(b);
     const invested = Number(a.expense || 0);
@@ -1559,8 +2121,9 @@ async function showBusinesses(){
       <div class="bp-card">
         <div class="bp-card-h">
           <div style="min-width:0">
-            <div class="bp-card-title">${String(b.name || '-')}</div>
-            <span class="bp-badge">${String(b.type || 'Business')}</span>
+            <div class="bp-card-title">${esc(b.name || '-')}</div>
+            <div style="opacity:.75;font-size:12px;margin-top:2px">Under ${esc(categoryLabel || (b.type || 'business'))} category</div>
+            <span class="bp-badge">${esc(categoryLabel || (b.type || 'Business'))}</span>
           </div>
           ${miniLineSvg(seriesVals, stroke)}
         </div>
@@ -1624,16 +2187,32 @@ async function showBusinesses(){
           </div>
 
           <div class="bp-actions">
-            <button class="bp-btn" onclick="openBusiness('${b.id}','${String(b.name || '').replace(/"/g,'&quot;')}')">Open</button>
-            <button class="bp-btn bp-btn-danger" onclick="deleteBusiness('${b.id}','${String(b.name || '').replace(/"/g,'&quot;')}')">Delete</button>
+            <button class="bp-btn" onclick='openBusiness(${JSON.stringify(String(b.id))}, ${JSON.stringify(String(b.name || ""))})'>Open</button>
+            <button class="bp-btn bp-btn-danger" onclick='deleteBusiness(${JSON.stringify(String(b.id))}, ${JSON.stringify(String(b.name || ""))})'>Delete</button>
           </div>
         </div>
       </div>
     `;
+  }
+
+  function renderCategorySection(cat, list){
+    if(!list || list.length === 0) return;
+    html += `
+      <div class="bp-section-title" style="margin-top:18px">${esc(cat)} category</div>
+      <div class="bp-business-grid">
+    `;
+    list.forEach(b => renderBusinessCard(b, cat));
+    html += `</div>`;
+  }
+
+  (categories || []).forEach(cat => {
+    const key = String(cat || "").trim().toLowerCase();
+    renderCategorySection(key, grouped[key] || []);
   });
 
+  renderCategorySection("other", other);
+
   html += `
-          </div>
         </div>
       </main>
     </div>
@@ -2089,91 +2668,173 @@ async function deleteMeeshoEntry(id){
   }
   await loadMeeshoEntries();
 }
-async function openBusiness(businessId, businessName){
+async function openBusiness(businessId, businessName, mode){
   title.innerText = businessName + " – Dashboard";
 
-  // basic screen for now
-  content.innerHTML = `
-  <div class="container">
+  const profile = _loadBusinessProfileLocal(businessId);
+  const configured = _isBusinessProfileConfigured(profile);
+  const screenMode = mode || (configured ? "view" : "setup");
 
-    <button onclick="showBusinesses()" style="margin-bottom:20px">
-      ← Back to Businesses
-    </button>
+  const esc = (s) => String(s ?? "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const inr = (n) => {
+    const num = Number(n || 0);
+    try { return `₹${num.toLocaleString('en-IN')}`; } catch(e){ return `₹${num}`; }
+  };
 
-    <div class="card">
-      <h3>${businessName} — Daily Report</h3>
+  function renderView(){
+    content.innerHTML = `
+      <div class="container" style="max-width:1100px;gap:18px;">
+        <button onclick="showBusinesses()" style="margin-bottom:4px">← Back to Businesses</button>
 
-      <input type="date" id="rep_date">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+            <h3 style="margin:0;">${esc(businessName)} — Dashboard</h3>
+            <button onclick='openBusiness(${JSON.stringify(String(businessId))}, ${JSON.stringify(String(businessName || ""))}, "edit")'>Edit Details</button>
+          </div>
 
-      <input type="number" id="rep_income" placeholder="Today Revenue (₹)">
-
-      <input type="number" id="rep_pool" placeholder="Money Taken from Pool (₹)">
-
-      <input type="number" id="rep_expense" placeholder="Today Expense (₹)">
-
-      <button onclick="saveDailyReport('${businessId}')">
-        Save Today Report
-      </button>
-    </div>
-
-    <div id="reportList"></div>
-
-  </div>
-`;
-  // fetch reports for this business
-  const { data, error } = await sb
-    .from("reports")
-    .select("*")
-    .eq("business_id", businessId);
-
-  if(error){
-    content.innerHTML += `
-      <div class="card">Failed to load business data</div>
-    `;
-    console.error(error);
-    return;
-  }
-
-  // show reports
-  const listEl = document.getElementById("reportList");
-  let reportHtml = `<div class="card"><h3 style="margin-top:0;">Reports</h3>`;
-
-  if(!data || data.length === 0){
-    reportHtml += `<div style="opacity:.8">No reports yet</div>`;
-  } else {
-    (data || [])
-      .slice()
-      .sort((a,b) => {
-        const ad = new Date(a.report_date || a.date || a.created_at || 0).getTime();
-        const bd = new Date(b.report_date || b.date || b.created_at || 0).getTime();
-        return bd - ad;
-      })
-      .forEach(r=>{
-        const date = r.report_date || r.date || (r.created_at ? String(r.created_at).slice(0,10) : "-");
-        const income = Number(r.income || 0);
-        const expense = Number(r.expense || 0);
-        const poolTaken = Number(r.pool_taken ?? r.pool ?? 0);
-        const profit = Number(r.profit ?? (income - expense));
-        const profitColor = profit >= 0 ? "#22c55e" : "#ef4444";
-
-        reportHtml += `
-          <div style="padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:14px;margin-top:12px">
-            <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-              <div style="font-weight:700">${date}</div>
-              <div style="font-weight:800;color:${profitColor}">Profit: ₹${profit.toLocaleString()}</div>
-            </div>
-            <div style="margin-top:8px;opacity:.9;display:flex;gap:14px;flex-wrap:wrap">
-              <div>Revenue: <b>₹${income.toLocaleString()}</b></div>
-              <div>Expense: <b>₹${expense.toLocaleString()}</b></div>
-              <div>Pool Taken: <b>₹${poolTaken.toLocaleString()}</b></div>
+          <div style="margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;">
+            <div style="flex:1 1 320px;min-width:280px;">
+              <div style="font-weight:600">Day of business incorporated</div>
+              <div style="margin-top:6px;opacity:.9">${profile.incorporated_date ? esc(profile.incorporated_date) : "-"}</div>
             </div>
           </div>
-        `;
-      });
+
+          <div style="margin-top:18px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1 1 320px;min-width:280px;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:14px;">
+              <div style="font-weight:800">Primary manager assigned</div>
+              <div style="margin-top:8px">Name: <b>${profile.primary_manager_name ? esc(profile.primary_manager_name) : "-"}</b></div>
+              <div style="margin-top:6px">Salary: <b>${profile.primary_manager_salary ? esc(inr(profile.primary_manager_salary)) : "-"}</b></div>
+            </div>
+
+            <div style="flex:1 1 320px;min-width:280px;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:14px;">
+              <div style="font-weight:800">Under which co-founder assigned</div>
+              <div style="margin-top:8px">Name: <b>${profile.cofounder_name ? esc(profile.cofounder_name) : "-"}</b></div>
+              <div style="margin-top:6px">Salary: <b>${profile.cofounder_salary ? esc(inr(profile.cofounder_salary)) : "-"}</b></div>
+            </div>
+
+            <div style="flex:1 1 320px;min-width:280px;padding:12px;border:1px solid rgba(0,0,0,.08);border-radius:14px;">
+              <div style="font-weight:800">Under which our food chef assigned</div>
+              <div style="margin-top:8px">Name: <b>${profile.chef_name ? esc(profile.chef_name) : "-"}</b></div>
+              <div style="margin-top:6px">Salary: <b>${profile.chef_salary ? esc(inr(profile.chef_salary)) : "-"}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
-  reportHtml += `</div>`;
-  if(listEl) listEl.innerHTML = reportHtml;
+  function renderEdit(isSetup){
+    content.innerHTML = `
+      <div class="container" style="max-width:1100px;gap:18px;">
+        <button onclick="showBusinesses()" style="margin-bottom:4px">← Back to Businesses</button>
+
+        <div class="card">
+          <h3 style="margin-top:0;">${esc(businessName)} — ${isSetup ? "Initial Setup" : "Edit Details"}</h3>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1 1 320px;min-width:280px;">
+              <label style="font-weight:600;display:block;">Day of business incorporated</label>
+              <input id="biz_incorporated_date" type="date" value="${esc(profile.incorporated_date || "")}">
+            </div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1 1 320px;min-width:280px;">
+              <label style="font-weight:700;display:block;">Primary manager assigned</label>
+              <input id="biz_primary_manager_name" placeholder="Manager name" value="${esc(profile.primary_manager_name || "")}">
+              <input id="biz_primary_manager_salary" type="number" placeholder="Salary (₹)" value="${esc(profile.primary_manager_salary ?? "")}">
+            </div>
+
+            <div style="flex:1 1 320px;min-width:280px;">
+              <label style="font-weight:700;display:block;">Under which co-founder assigned</label>
+              <input id="biz_cofounder_name" placeholder="Co-founder name" value="${esc(profile.cofounder_name || "")}">
+              <input id="biz_cofounder_salary" type="number" placeholder="Salary (₹)" value="${esc(profile.cofounder_salary ?? "")}">
+            </div>
+
+            <div style="flex:1 1 320px;min-width:280px;">
+              <label style="font-weight:700;display:block;">Under which our food chef assigned</label>
+              <input id="biz_chef_name" placeholder="Chef name" value="${esc(profile.chef_name || "")}">
+              <input id="biz_chef_salary" type="number" placeholder="Salary (₹)" value="${esc(profile.chef_salary ?? "")}">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+            <button onclick='saveBusinessProfile(${JSON.stringify(String(businessId))}, ${JSON.stringify(String(businessName || ""))})'>Save & Continue</button>
+            ${isSetup ? "" : `<button onclick='openBusiness(${JSON.stringify(String(businessId))}, ${JSON.stringify(String(businessName || ""))}, "view")'>Cancel</button>`}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if(screenMode === "edit") return renderEdit(false);
+  if(screenMode === "setup") return renderEdit(true);
+  return renderView();
+}
+
+function _localBusinessProfileKey(businessId){
+  return `xco_business_profile_v1:${businessId}`;
+}
+
+function _normalizeBusinessProfile(raw){
+  const obj = raw && typeof raw === "object" ? raw : {};
+  return {
+    incorporated_date: obj.incorporated_date || obj.incorporatedDate || obj.day_incorporated || obj.dayOfBusinessIncorporated || "",
+    primary_manager_name: obj.primary_manager_name || obj.primaryManagerName || obj.primary_manager || "",
+    primary_manager_salary: (obj.primary_manager_salary ?? obj.primaryManagerSalary ?? obj.primary_manager_pay ?? ""),
+    cofounder_name: obj.cofounder_name || obj.coFounderName || obj.cofounder || "",
+    cofounder_salary: (obj.cofounder_salary ?? obj.coFounderSalary ?? obj.cofounder_pay ?? ""),
+    chef_name: obj.chef_name || obj.foodChefName || obj.chef || "",
+    chef_salary: (obj.chef_salary ?? obj.foodChefSalary ?? obj.chef_pay ?? ""),
+  };
+}
+
+function _loadBusinessProfileLocal(businessId){
+  try {
+    const raw = localStorage.getItem(_localBusinessProfileKey(businessId));
+    if(raw){
+      const parsed = JSON.parse(raw);
+      return _normalizeBusinessProfile(parsed);
+    }
+  } catch (e) {}
+  return _normalizeBusinessProfile({});
+}
+
+function _isBusinessProfileConfigured(profile){
+  const p = profile || {};
+  return !!(
+    (p.incorporated_date && String(p.incorporated_date).trim()) ||
+    (p.primary_manager_name && String(p.primary_manager_name).trim()) ||
+    (p.cofounder_name && String(p.cofounder_name).trim()) ||
+    (p.chef_name && String(p.chef_name).trim())
+  );
+}
+
+async function saveBusinessProfile(businessId, businessName){
+  const incorporated_date = document.getElementById("biz_incorporated_date")?.value || "";
+  const primary_manager_name = document.getElementById("biz_primary_manager_name")?.value || "";
+  const primary_manager_salary = Number(document.getElementById("biz_primary_manager_salary")?.value || 0);
+  const cofounder_name = document.getElementById("biz_cofounder_name")?.value || "";
+  const cofounder_salary = Number(document.getElementById("biz_cofounder_salary")?.value || 0);
+  const chef_name = document.getElementById("biz_chef_name")?.value || "";
+  const chef_salary = Number(document.getElementById("biz_chef_salary")?.value || 0);
+
+  const profile = _normalizeBusinessProfile({
+    incorporated_date,
+    primary_manager_name,
+    primary_manager_salary,
+    cofounder_name,
+    cofounder_salary,
+    chef_name,
+    chef_salary,
+  });
+
+  // Store locally (keeping it independent from Founder/Supabase complexity)
+  try {
+    localStorage.setItem(_localBusinessProfileKey(businessId), JSON.stringify(profile));
+  } catch(e) {}
+
+  // After first-time save, redirect to dashboard view
+  await openBusiness(businessId, businessName || title.innerText.split(" – ")[0], "view");
 }
 
 function _monthFromISODate(dateStr){
@@ -2952,25 +3613,118 @@ function saveBusinessPDF(bizName){
 function showAddBusiness(){
   title.innerText = "Add Business";
 
+  const categories = _getBusinessCategories();
+  const categoryOptions = categories
+    .map(c => `<option value="${String(c).replace(/"/g,'&quot;')}">${c}</option>`)
+    .join("");
+
+  const baseOptions = _getDefaultBusinessCategories()
+    .map(c => `<option value="${String(c).replace(/"/g,'&quot;')}">${c}</option>`)
+    .join("");
+
   content.innerHTML = `
-    <div class="card">
-      <input id="biz_name" placeholder="Business Name">
-      <input id="biz_type" placeholder="Business Type">
-      <button onclick="saveBusiness()">Save Business</button>
+    <div class="container" style="max-width:1100px;">
+      <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">
+
+        <div class="card" style="flex:1 1 420px;min-width:320px;">
+          <h3 style="margin-top:0;">Add Business</h3>
+          <input id="biz_name" placeholder="Business Name">
+          <label style="font-weight:600;margin-top:10px;display:block;">Business Category</label>
+          <select id="biz_category" style="margin-top:10px;width:100%;padding:10px 12px;border-radius:10px;">
+            ${categoryOptions}
+          </select>
+          <button style="margin-top:14px" onclick="saveBusiness()">Save Business</button>
+        </div>
+
+        <div class="card" style="flex:1 1 420px;min-width:320px;">
+          <h3 style="margin-top:0;">Add Business Category</h3>
+          <div style="opacity:.85;margin-bottom:12px">Select a category (for now)</div>
+          <select id="new_category" style="width:100%;padding:10px 12px;border-radius:10px;">
+            ${baseOptions}
+          </select>
+          <button style="margin-top:14px" onclick="addBusinessCategory()">Add Category</button>
+
+          <div style="margin-top:16px;opacity:.9">
+            <b>Available:</b> <span id="categoryPreview">${categories.join(", ")}</span>
+          </div>
+        </div>
+
+      </div>
     </div>
   `;
 }
-async function saveBusiness(){
-  const name = document.getElementById("biz_name").value;
-  const type = document.getElementById("biz_type").value;
 
-  if(!name || !type){
-    alert("Name aur Type bhar");
+function _getDefaultBusinessCategories(){
+  return ["food","software","services"];
+}
+
+function _getBusinessCategories(){
+  const key = "xco_business_categories_v1";
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const list = Array.isArray(parsed) ? parsed : [];
+    const merged = _uniqStr([
+      ..._getDefaultBusinessCategories(),
+      ...list
+    ]);
+    localStorage.setItem(key, JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    return _getDefaultBusinessCategories();
+  }
+}
+
+function _setBusinessCategories(list){
+  const key = "xco_business_categories_v1";
+  const merged = _uniqStr([ ..._getDefaultBusinessCategories(), ...(list || []) ]);
+  try { localStorage.setItem(key, JSON.stringify(merged)); } catch(e) {}
+  return merged;
+}
+
+function _uniqStr(arr){
+  const out = [];
+  const seen = new Set();
+  (arr || []).forEach(v => {
+    const s = String(v || "").trim().toLowerCase();
+    if(!s) return;
+    if(seen.has(s)) return;
+    seen.add(s);
+    out.push(s);
+  });
+  return out;
+}
+
+function addBusinessCategory(){
+  const sel = document.getElementById("new_category");
+  const picked = sel?.value;
+  if(!picked){
+    alert("Select category");
+    return;
+  }
+  const existing = _getBusinessCategories();
+  const updated = _setBusinessCategories([ ...existing, picked ]);
+
+  // refresh the screen so left dropdown updates
+  showAddBusiness();
+  // keep same selection if possible
+  setTimeout(() => {
+    const s2 = document.getElementById("new_category");
+    if(s2) s2.value = picked;
+  }, 0);
+  return updated;
+}
+async function saveBusiness(){
+  const name = document.getElementById("biz_name")?.value;
+  const category = document.getElementById("biz_category")?.value;
+
+  if(!name || !category){
+    alert("Business name aur category select karo");
     return;
   }
 
   const { error } = await sb.from("businesses").insert([
-    { name, type }
+    { name, type: String(category).trim().toLowerCase() }
   ]);
 
   if(error){
@@ -2985,9 +3739,11 @@ async function saveBusiness(){
 
 async function showEmployees(){
   title.innerText = "Employees of The X Company";
+  if(typeof subtitleEl !== 'undefined' && subtitleEl) subtitleEl.textContent = 'Team & PM management';
 
   const empRes = await sb.from("employees").select("id,name,role");
   const salRes = await sb.from("employee_salary_config").select("employee_id,salary_fixed,basic_pay,start_date,annual_rate");
+  const { data: pmUsers } = await sb.from('pm_login_users').select('id,name,username,created_at').order('created_at',{ascending:false});
 
   if(empRes.error){
     content.innerHTML = "<div class='card'>Error loading employees</div>";
@@ -3000,60 +3756,60 @@ async function showEmployees(){
     salRes.data.forEach(r => { salaryMap[r.employee_id] = r; });
   }
 
-  let html = "<div class='container'>";
-
+  let empCards = '';
   empRes.data.forEach(e=>{
-
     const cfg = salaryMap[e.id];
-    let salaryHtml = "";
+    let salaryHtml = '';
     if(cfg?.salary_fixed){
       const proj = _salaryProjection({
         basicPay: Number(cfg.basic_pay || 0),
         startDate: cfg.start_date,
         annualRate: Number(cfg.annual_rate || 0.06)
       });
-
       const schedule = _salaryMonthlySchedule({
         basicPay: Number(cfg.basic_pay || 0),
         startDate: cfg.start_date,
         annualRate: Number(cfg.annual_rate || 0.06)
       });
-
       const scheduleRowsHtml = schedule.map(r => `
         <tr>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">M${r.monthNo}<div style="font-size:11px;opacity:.7">${r.ym}</div></td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.basicPay)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.da)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.hra)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.medical)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.wifi)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)"><b>₹${Math.round(r.gross)}</b></td>
-          <td style="padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.08)">₹${Math.round(r.cumulative)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">M${r.monthNo}<div style="font-size:11px;color:#9CA3AF">${r.ym}</div></td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.basicPay)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.da)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.hra)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.medical)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.wifi)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;font-weight:600">₹${Math.round(r.gross)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6">₹${Math.round(r.cumulative)}</td>
         </tr>
-      `).join("");
-
+      `).join('');
       salaryHtml = `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,.08)">
-          <div style="font-size:13px;opacity:.85">Salary Fixed • Start: <b>${cfg.start_date || "-"}</b> • Months: <b>${proj.months}</b></div>
-          <div style="margin-top:6px">
-            Gross (current): <b>₹${Math.round(proj.current.gross)}</b><br>
-            Accumulated (approx): <b>₹${Math.round(proj.accumulated)}</b>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #F3F4F6">
+          <div style="font-size:13px;color:#6B7280">Salary Fixed • Start: <b style="color:#111827">${cfg.start_date || '-'}</b> • Months: <b style="color:#111827">${proj.months}</b></div>
+          <div style="display:flex;gap:20px;margin-top:8px">
+            <div style="background:#F0FDF4;border-radius:8px;padding:8px 14px">
+              <div style="font-size:11px;color:#16A34A;font-weight:600">GROSS (CURRENT)</div>
+              <div style="font-size:16px;font-weight:700;color:#15803D">₹${Math.round(proj.current.gross)}</div>
+            </div>
+            <div style="background:#EFF6FF;border-radius:8px;padding:8px 14px">
+              <div style="font-size:11px;color:#2563EB;font-weight:600">ACCUMULATED</div>
+              <div style="font-size:16px;font-weight:700;color:#1D4ED8">₹${Math.round(proj.accumulated)}</div>
+            </div>
           </div>
-
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;font-weight:600">View Breakdowns</summary>
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#6B7280">▶ View Breakdowns</summary>
             <div style="overflow:auto;margin-top:10px">
-              <table style="width:100%;border-collapse:collapse;min-width:760px">
+              <table style="width:100%;border-collapse:collapse;min-width:760px;font-size:13px">
                 <thead>
-                  <tr>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">Month</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">Basic</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">DA</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">HRA</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">Medical</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">WiFi</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">Gross</th>
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)">Cumulative</th>
+                  <tr style="background:#F9FAFB">
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">Month</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">Basic</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">DA</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">HRA</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">Medical</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">WiFi</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">Gross</th>
+                    <th style="text-align:left;padding:8px;font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase">Cumulative</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3065,22 +3821,111 @@ async function showEmployees(){
         </div>
       `;
     }
-
-    html += `
-      <div class="card">
-        <b>${e.name}</b> – ${e.role}
-        <div style="margin-top:10px">
-          <button onclick="openEmployeeProfile('${e.id}')">View Profile</button>
-          <button style="background:#ef4444;margin-left:10px" onclick="deleteEmployee('${e.id}')">Delete</button>
-          <button style="margin-left:10px" onclick="saveEmployeePayslipPDF('${e.id}')">Payslip PDF</button>
+    empCards += `
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 8px 20px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="width:40px;height:40px;background:#3B82F6;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${(e.name||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#111827">${e.name}</div>
+            <div style="font-size:12px;color:#6B7280">${e.role}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="openEmployeeProfile('${e.id}')" style="padding:7px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:12px;font-weight:500;background:#fff;color:#374151;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#F9FAFB';this.style.borderColor='#3B82F6'" onmouseout="this.style.background='#fff';this.style.borderColor='#E5E7EB'">View Profile</button>
+          <button onclick="deleteEmployee('${e.id}')" style="padding:7px 14px;border:1px solid #FCA5A5;border-radius:8px;font-size:12px;font-weight:500;background:#fff;color:#EF4444;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='#fff'">Delete</button>
+          <button onclick="saveEmployeePayslipPDF('${e.id}')" style="padding:7px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:12px;font-weight:500;background:#fff;color:#374151;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='#fff'">Payslip PDF</button>
+          <button onclick="showEmployeeLedger('${e.id}','${e.name.replace(/'/g,"\\'")}')" style="padding:7px 14px;border:1px solid #DDD6FE;border-radius:8px;font-size:12px;font-weight:500;background:#fff;color:#7C3AED;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#F5F3FF'" onmouseout="this.style.background='#fff'">Ledger</button>
         </div>
         ${salaryHtml}
       </div>
     `;
   });
 
-  html += "</div>";
-  content.innerHTML = html;
+  const pmList = (pmUsers||[]);
+  let pmCardsHtml = '';
+  if(pmList.length === 0){
+    pmCardsHtml = '<div style="text-align:center;padding:32px;color:#9CA3AF;font-size:14px">No PM users yet</div>';
+  } else {
+    pmCardsHtml = pmList.map(p => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #F3F4F6;transition:background .15s" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;background:#7C3AED;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px">${(p.name||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#111827">${p.name}</div>
+            <div style="font-size:12px;color:#6B7280;font-family:monospace">${p.username}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#9CA3AF">${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  const empCount = empRes.data.length;
+  const pmCount = pmList.length;
+
+  content.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:28px">
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 8px 20px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;background:#3B82F6;border-radius:10px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:500;color:#6B7280">Total Employees</div>
+            <div style="font-size:22px;font-weight:700;color:#111827">${empCount}</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 8px 20px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;background:#7C3AED;border-radius:10px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:500;color:#6B7280">PM Users</div>
+            <div style="font-size:22px;font-weight:700;color:#111827">${pmCount}</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 8px 20px rgba(0,0,0,.06)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;background:#22C55E;border-radius:10px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:500;color:#6B7280">Active Team</div>
+            <div style="font-size:22px;font-weight:700;color:#111827">${empCount + pmCount}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <div style="width:36px;height:36px;background:#3B82F6;border-radius:10px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#111827">Employees <span style="font-weight:400;color:#6B7280;font-size:14px">(${empCount})</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          ${empCards || '<div style="text-align:center;padding:32px;color:#9CA3AF">No employees yet</div>'}
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <div style="width:36px;height:36px;background:#7C3AED;border-radius:10px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#111827">PM Users <span style="font-weight:400;color:#6B7280;font-size:14px">(${pmCount})</span></div>
+        </div>
+        <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden">
+          ${pmCardsHtml}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 async function openEmployeeProfile(empId){
@@ -3182,10 +4027,12 @@ async function openEmployeeProfile(empId){
     `;
   }
 
+  const empName = emp?.data?.name || 'Employee';
+
   content.innerHTML = `
     <div class="container">
       <div class="card">
-        <h3 style="margin-top:0;">${emp?.data?.name || "Employee"}</h3>
+        <h3 style="margin-top:0;">${empName}</h3>
         Role: <b>${emp?.data?.role || "-"}</b><br>
         Joined on: ${joined}
       </div>
@@ -3194,9 +4041,321 @@ async function openEmployeeProfile(empId){
 
       ${salaryBlock}
 
-      <div class="card"><button onclick="showEmployees()">Back</button></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button onclick="showEmployees()"
+          style="background:#fff;color:#111827;border:2px solid #E5E7EB;border-radius:12px;padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s"
+          onmouseover="this.style.borderColor='#6B7280';this.style.background='#F9FAFB'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+          ← Back to Employees
+        </button>
+      </div>
     </div>
   `;
+}
+
+/* ===== Employee Ledger (AR / AP) ===== */
+async function showEmployeeLedger(empId, empName){
+  title.innerText = 'Ledger Account';
+  if(typeof subtitleEl !== 'undefined' && subtitleEl) subtitleEl.textContent = empName;
+
+  const { data: arData, error: arErr } = await sb
+    .from('employee_ledger')
+    .select('*')
+    .eq('employee_id', empId)
+    .eq('type', 'AR')
+    .order('date', { ascending: false });
+
+  const { data: apData, error: apErr } = await sb
+    .from('employee_ledger')
+    .select('*')
+    .eq('employee_id', empId)
+    .eq('type', 'AP')
+    .order('date', { ascending: false });
+
+  if(arErr || apErr){
+    content.innerHTML = `<div class="card" style="color:#EF4444">Error loading ledger: ${(arErr||apErr).message}</div>`;
+    return;
+  }
+
+  // Fetch salary gross (current)
+  let grossCurrent = 0;
+  const salRes = await sb
+    .from('employee_salary_config')
+    .select('salary_fixed,basic_pay,start_date,annual_rate')
+    .eq('employee_id', empId)
+    .maybeSingle();
+  if(!salRes?.error && salRes?.data?.salary_fixed){
+    const cfg = salRes.data;
+    const proj = _salaryProjection({
+      basicPay: Number(cfg.basic_pay || 0),
+      startDate: cfg.start_date,
+      annualRate: Number(cfg.annual_rate || 0.06)
+    });
+    grossCurrent = Math.round(proj.current.gross);
+  }
+
+  const arTotal = (arData||[]).reduce((s,r) => s + Number(r.amount||0), 0);
+  const apManualTotal = (apData||[]).reduce((s,r) => s + Number(r.amount||0), 0);
+  const apTotal = apManualTotal + grossCurrent;
+  const netBalance = apTotal - arTotal;
+
+  function buildGrossRow(){
+    if(grossCurrent <= 0) return '';
+    return `
+      <tr style="background:#F0FDF4">
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;color:#15803D;font-weight:600">Current</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;color:#15803D;font-weight:600">Gross Salary (Current Month)</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;font-weight:700;color:#15803D">\u20b9${grossCurrent.toLocaleString('en-IN')}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:11px;color:#9CA3AF">Auto</td>
+      </tr>
+    `;
+  }
+
+  function buildRows(entries, type){
+    if(!entries || entries.length === 0) return '<tr><td colspan="4" style="padding:16px;text-align:center;color:#9CA3AF">No entries yet</td></tr>';
+    return entries.map(e => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;color:#374151">${new Date(e.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;color:#374151">${e.description}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6;font-size:14px;font-weight:600;color:#111827">\u20b9${Number(e.amount).toLocaleString('en-IN')}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #F3F4F6">
+          <div style="display:flex;gap:6px">
+            <button onclick="editLedgerEntry('${e.id}','${empId}','${empName.replace(/'/g,"\\\'")}')" style="background:none;border:1px solid #E5E7EB;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:#374151" onmouseover="this.style.borderColor='#3B82F6'" onmouseout="this.style.borderColor='#E5E7EB'">Edit</button>
+            <button onclick="deleteLedgerEntry('${e.id}','${empId}','${empName.replace(/'/g,"\\\'")}')" style="background:none;border:1px solid #E5E7EB;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:#EF4444" onmouseover="this.style.borderColor='#EF4444'" onmouseout="this.style.borderColor='#E5E7EB'">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  const iconAR = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><path d="M17 17H7"/></svg>';
+  const iconAP = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V2"/><path d="m7 17 5 5 5-5"/><path d="M17 7H7"/></svg>';
+
+  content.innerHTML = `
+    <div style="background:#F5F3FF;border-radius:16px;padding:28px;margin:-12px;margin-bottom:0">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
+        <div style="font-size:13px;font-weight:500;color:#6B7280;margin-bottom:4px">Accounts Receivable (AR)</div>
+        <div style="font-size:22px;font-weight:700;color:#EF4444">\u20b9${arTotal.toLocaleString('en-IN')}</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:4px">You owe the company</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
+        <div style="font-size:13px;font-weight:500;color:#6B7280;margin-bottom:4px">Accounts Payable (AP)</div>
+        <div style="font-size:22px;font-weight:700;color:#22C55E">\u20b9${apTotal.toLocaleString('en-IN')}</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:4px">Company owes you</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
+        <div style="font-size:13px;font-weight:500;color:#6B7280;margin-bottom:4px">Net Balance</div>
+        <div style="font-size:22px;font-weight:700;color:${netBalance >= 0 ? '#22C55E' : '#EF4444'}">\u20b9${Math.abs(netBalance).toLocaleString('en-IN')}</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:4px">${netBalance >= 0 ? 'Company pays you' : 'You pay company'}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <!-- AR Section -->
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden">
+        <div style="padding:20px 24px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:40px;height:40px;background:#FEF2F2;border-radius:10px;display:flex;align-items:center;justify-content:center">${iconAR}</div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#111827">Accounts Receivable</div>
+              <div style="font-size:12px;color:#6B7280">You Have To Pay To Company</div>
+            </div>
+          </div>
+          <button onclick="addLedgerEntry('${empId}','${empName.replace(/'/g,"\\\'")}','AR')" style="background:#EF4444;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Add Entry
+          </button>
+        </div>
+        <div style="overflow:auto;max-height:400px">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#FAFAFA">
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Date</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Description</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Amount</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>${buildRows(arData, 'AR')}</tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;background:#FAFAFA">
+          <span style="font-size:14px;font-weight:600;color:#374151">Total AR</span>
+          <span style="font-size:16px;font-weight:700;color:#EF4444">\u20b9${arTotal.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+
+      <!-- AP Section -->
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden">
+        <div style="padding:20px 24px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:40px;height:40px;background:#F0FDF4;border-radius:10px;display:flex;align-items:center;justify-content:center">${iconAP}</div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#111827">Accounts Payable</div>
+              <div style="font-size:12px;color:#6B7280">Company Will Pay You</div>
+            </div>
+          </div>
+          <button onclick="addLedgerEntry('${empId}','${empName.replace(/'/g,"\\\'")}','AP')" style="background:#22C55E;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Add Entry
+          </button>
+        </div>
+        <div style="overflow:auto;max-height:400px">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#FAFAFA">
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Date</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Description</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Amount</th>
+                <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>${buildGrossRow()}${buildRows(apData, 'AP')}</tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;background:#FAFAFA">
+          <span style="font-size:14px;font-weight:600;color:#374151">Total AP</span>
+          <span style="font-size:16px;font-weight:700;color:#22C55E">\u20b9${apTotal.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px">
+      <button onclick="openEmployeeProfile('${empId}')"
+        style="background:#fff;color:#111827;border:2px solid #E5E7EB;border-radius:12px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s"
+        onmouseover="this.style.borderColor='#6B7280';this.style.background='#F9FAFB'" onmouseout="this.style.borderColor='#E5E7EB';this.style.background='#fff'">
+        \u2190 Back to Profile
+      </button>
+    </div>
+    </div>
+  `;
+}
+
+function addLedgerEntry(empId, empName, type){
+  const typeLabel = type === 'AR' ? 'Accounts Receivable' : 'Accounts Payable';
+  const typeColor = type === 'AR' ? '#EF4444' : '#22C55E';
+  const today = new Date().toISOString().split('T')[0];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ledger-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:32px;width:420px;max-width:90vw;box-shadow:0 25px 60px rgba(0,0,0,.15)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
+        <div style="width:10px;height:10px;border-radius:99px;background:${typeColor}"></div>
+        <div style="font-size:18px;font-weight:700;color:#111827">Add ${typeLabel}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Date</label>
+          <input type="date" id="ledger_date" value="${today}" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
+          <input type="text" id="ledger_desc" placeholder="e.g. Advance salary, Loan repayment..." style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Amount (\u20b9)</label>
+          <input type="number" id="ledger_amount" placeholder="0" min="0" step="0.01" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:28px">
+        <button id="ledger_save_btn" style="flex:1;background:${typeColor};color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">Save Entry</button>
+        <button id="ledger_cancel_btn" style="flex:1;background:#F3F4F6;color:#374151;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s" onmouseover="this.style.background='#E5E7EB'" onmouseout="this.style.background='#F3F4F6'">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#ledger_cancel_btn').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (ev) => { if(ev.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#ledger_save_btn').onclick = async () => {
+    const date = document.getElementById('ledger_date').value;
+    const desc = document.getElementById('ledger_desc').value.trim();
+    const amount = Number(document.getElementById('ledger_amount').value);
+    if(!desc){ alert('Description is required'); return; }
+    if(!amount || amount <= 0){ alert('Enter a valid amount'); return; }
+
+    const { error } = await sb.from('employee_ledger').insert([{
+      employee_id: empId,
+      type: type,
+      description: desc,
+      amount: amount,
+      date: date
+    }]);
+    if(error){ alert('Error: ' + error.message); return; }
+    overlay.remove();
+    showEmployeeLedger(empId, empName);
+  };
+}
+
+async function editLedgerEntry(entryId, empId, empName){
+  const { data: entry, error } = await sb
+    .from('employee_ledger')
+    .select('*')
+    .eq('id', entryId)
+    .single();
+  if(error || !entry){ alert('Could not load entry'); return; }
+
+  const typeColor = entry.type === 'AR' ? '#EF4444' : '#22C55E';
+  const typeLabel = entry.type === 'AR' ? 'Accounts Receivable' : 'Accounts Payable';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ledger-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:32px;width:420px;max-width:90vw;box-shadow:0 25px 60px rgba(0,0,0,.15)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
+        <div style="width:10px;height:10px;border-radius:99px;background:${typeColor}"></div>
+        <div style="font-size:18px;font-weight:700;color:#111827">Edit ${typeLabel}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Date</label>
+          <input type="date" id="ledger_date" value="${entry.date}" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
+          <input type="text" id="ledger_desc" value="${entry.description.replace(/"/g,'&quot;')}" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Amount (\u20b9)</label>
+          <input type="number" id="ledger_amount" value="${entry.amount}" min="0" step="0.01" style="width:100%;padding:10px 14px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='${typeColor}'" onblur="this.style.borderColor='#E5E7EB'">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:28px">
+        <button id="ledger_save_btn" style="flex:1;background:${typeColor};color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">Update Entry</button>
+        <button id="ledger_cancel_btn" style="flex:1;background:#F3F4F6;color:#374151;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s" onmouseover="this.style.background='#E5E7EB'" onmouseout="this.style.background='#F3F4F6'">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#ledger_cancel_btn').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (ev) => { if(ev.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#ledger_save_btn').onclick = async () => {
+    const date = document.getElementById('ledger_date').value;
+    const desc = document.getElementById('ledger_desc').value.trim();
+    const amount = Number(document.getElementById('ledger_amount').value);
+    if(!desc){ alert('Description is required'); return; }
+    if(!amount || amount <= 0){ alert('Enter a valid amount'); return; }
+
+    const { error: upErr } = await sb.from('employee_ledger')
+      .update({ date, description: desc, amount })
+      .eq('id', entryId);
+    if(upErr){ alert('Error: ' + upErr.message); return; }
+    overlay.remove();
+    showEmployeeLedger(empId, empName);
+  };
+}
+
+async function deleteLedgerEntry(entryId, empId, empName){
+  if(!confirm('Delete this ledger entry?')) return;
+  const { error } = await sb.from('employee_ledger').delete().eq('id', entryId);
+  if(error){ alert('Delete failed: ' + error.message); return; }
+  showEmployeeLedger(empId, empName);
 }
 
 async function deleteEmployee(empId){
@@ -3224,6 +4383,7 @@ async function deleteEmployee(empId){
   await safeDelete("payouts", "employee_id");
   await safeDelete("locked_bonus_ledger", "employee_id");
   await safeDelete("employee_salary_config", "employee_id");
+  await safeDelete("employee_ledger", "employee_id");
 
   const { error } = await sb
     .from("employees")

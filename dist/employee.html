@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Employee Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:0; }
+    h1 {
+      font-size: 2.1rem;
+      font-weight: 700;
+      margin-top: 38px;
+      margin-bottom: 18px;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 8px #fff3;
+      text-align: center;
+    }
+    .container {
+      max-width: 1100px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: center;
+    }
+    .card {
+      padding: 32px 28px;
+      margin-bottom: 18px;
+      width: 100%;
+      max-width: 600px;
+      animation: fadeInCard 1.1s cubic-bezier(.77,0,.18,1) forwards;
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    @keyframes fadeInCard {
+      to { opacity: 1; transform: scale(1); }
+    }
+    textarea, input, select { margin-bottom:18px; }
+    button { width:100%; margin-top:8px; }
+    hr {
+      border: none;
+      height: 1.5px;
+      background: linear-gradient(90deg,transparent,#e2e4ea,transparent);
+      margin: 36px 0;
+      width: 100%;
+    }
+    @media (max-width: 700px) {
+      .container { max-width: 98vw; }
+      .card { max-width: 98vw; padding: 18px 8vw; }
+    }
+  </style>
+</head>
+<body class="x-theme">
+
+
+<div id="loginScreen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;">
+  <h1>Employee Login</h1>
+  <select id="employeeSelect" style="padding:12px 18px;border-radius:12px;font-size:1.1rem;margin-bottom:18px;"></select>
+  <button onclick="loginAsEmployee()">Login</button>
+</div>
+
+<div id="employeePanel" style="display:none;">
+  <h1 id="panelTitle">Employee Panel</h1>
+  <button id="logoutBtn">Logout</button>
+  <hr>
+  <div id="hrPanel" style="display:none;">
+    <h2>HR: Create Task</h2>
+    <div class="card">
+      <input id="hr_task_title" placeholder="Task title">
+      <textarea id="hr_task_desc" placeholder="Task description"></textarea>
+      <input id="hr_task_points" type="number" placeholder="Points">
+      <input id="hr_task_deadline" type="datetime-local" placeholder="Deadline">
+      <button onclick="createHRTask()">Create Task</button>
+    </div>
+    <h2>All Tasks</h2>
+    <div id="hrTaskList">Loading...</div>
+  </div>
+  <div id="empPanel" style="display:none;">
+    <h2>Available Tasks</h2>
+    <div id="taskList">Loading...</div>
+  </div>
+</div>
+
+<script>
+
+const sb = supabase.createClient(
+  "https://ecjxynuccpncwsogezos.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
+);
+
+let currentEmployee = null;
+
+// Populate employee select on load
+window.addEventListener('DOMContentLoaded', async () => {
+  const { data, error } = await sb.from('employees').select('id,name,role');
+  const select = document.getElementById('employeeSelect');
+  if (error || !data) {
+    select.innerHTML = '<option>Error loading employees</option>';
+    return;
+  }
+  select.innerHTML = data.map(e => `<option value="${e.id}">${e.name} (${e.role})</option>`).join('');
+});
+
+function loginAsEmployee() {
+  const select = document.getElementById('employeeSelect');
+  const empId = select.value;
+  if (!empId) return alert('Select an employee');
+  // Save to localStorage for session
+  localStorage.setItem('employeeId', empId);
+  currentEmployee = empId;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('employeePanel').style.display = 'block';
+  loadTasks();
+}
+
+// Auto-login if already selected
+const savedEmp = localStorage.getItem('employeeId');
+if (savedEmp) {
+  currentEmployee = savedEmp;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('employeePanel').style.display = 'block';
+    loadTasks();
+  });
+}
+
+// LOGOUT
+document.addEventListener('DOMContentLoaded', () => {
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.onclick = () => {
+      localStorage.removeItem('employeeId');
+      currentEmployee = null;
+      document.getElementById('employeePanel').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'flex';
+    };
+  }
+});
+
+// LOAD TASKS
+async function loadTasks(){
+  // Use currentEmployee for context
+  if (!currentEmployee) {
+    document.getElementById("taskList").innerHTML = "Please login as an employee.";
+    return;
+  }
+  // Get employee info
+  const { data: emp } = await sb.from('employees').select('*').eq('id', currentEmployee).single();
+  if (!emp) {
+    document.getElementById("taskList").innerHTML = "Employee not found.";
+    return;
+  }
+  // HR Panel
+  if (emp.role && emp.role.toUpperCase() === 'HR') {
+    document.getElementById('panelTitle').innerText = 'HR Panel';
+    document.getElementById('hrPanel').style.display = 'block';
+    document.getElementById('empPanel').style.display = 'none';
+    loadHRPanelTasks();
+  } else {
+    document.getElementById('panelTitle').innerText = 'Employee Panel';
+    document.getElementById('hrPanel').style.display = 'none';
+    document.getElementById('empPanel').style.display = 'block';
+    await loadEmployeeTasks(emp);
+  }
+}
+
+function _declinedKey(){
+  return `declinedTasks:${currentEmployee}`;
+}
+
+function _getDeclinedSet(){
+  try {
+    const raw = localStorage.getItem(_declinedKey());
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function _saveDeclined(set){
+  localStorage.setItem(_declinedKey(), JSON.stringify(Array.from(set)));
+}
+
+function _fmtDeadline(v){
+  if(!v) return '-';
+  try { return new Date(v).toLocaleString(); } catch { return String(v); }
+}
+
+async function _safeUpdateTask(taskId, patch){
+  // Try update with patch; if schema mismatch, retry without unknown fields
+  let res = await sb.from('tasks').update(patch).eq('id', taskId);
+  if(!res.error) return res;
+
+  const msg = res.error?.message || '';
+  if(/column .*status/i.test(msg) && patch.status !== undefined){
+    const { status, ...rest } = patch;
+    res = await sb.from('tasks').update(rest).eq('id', taskId);
+  }
+  return res;
+}
+
+async function loadEmployeeTasks(emp){
+  const declined = _getDeclinedSet();
+
+  const tasksRes = await sb
+    .from('tasks')
+    .select('id,title,description,points,deadline,status,accepted_by,created_at')
+    .order('created_at',{ascending:false});
+
+  const tasks = tasksRes.data || [];
+  if(tasks.length === 0){
+    document.getElementById('taskList').innerHTML = 'No tasks available.';
+    return;
+  }
+
+  // Map employee names for accepted_by
+  const empRes = await sb.from('employees').select('id,name');
+  const empMap = {};
+  (empRes.data || []).forEach(e => { empMap[e.id] = e.name; });
+
+  let html = '';
+  for(const t of tasks){
+    if(declined.has(t.id)) continue;
+
+    const acceptedBy = t.accepted_by;
+    const acceptedByMe = acceptedBy && acceptedBy === currentEmployee;
+    const acceptedByOther = acceptedBy && acceptedBy !== currentEmployee;
+
+    html += `<div class="card">
+      <b>${t.title || ''}</b><br>
+      ${t.description || ''}<br>
+      <div style="margin-top:10px;font-size:0.98rem;color:#444;line-height:1.35">
+        Points: <b>${t.points || 0}</b><br>
+        Deadline: <b>${_fmtDeadline(t.deadline)}</b><br>
+        Status: <b>${t.status || 'OPEN'}</b><br>
+        Accepted By: <b>${acceptedBy ? (empMap[acceptedBy] || acceptedBy) : '-'}</b>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;">
+    `;
+
+    if(!acceptedBy){
+      html += `
+        <button style="flex:1;min-width:150px;" onclick="acceptTask('${t.id}')">Accept</button>
+        <button style="flex:1;min-width:150px;background:#ef4444;color:#fff;" onclick="rejectTask('${t.id}')">Reject</button>
+      `;
+    } else if(acceptedByMe){
+      html += `
+        <button style="flex:1;min-width:150px;background:#ef4444;color:#fff;" onclick="rejectTask('${t.id}', true)">Reject / Remove</button>
+      `;
+    } else if(acceptedByOther){
+      html += `<span style="color:#888">Already accepted by another employee.</span>`;
+      html += `
+        <button style="flex:1;min-width:150px;background:#ef4444;color:#fff;" onclick="rejectTask('${t.id}')">Hide</button>
+      `;
+    }
+
+    html += `</div></div>`;
+  }
+
+  document.getElementById('taskList').innerHTML = html || 'No tasks available.';
+}
+
+// Accept: claim the task only if accepted_by is NULL
+async function acceptTask(taskId){
+  if(!currentEmployee) return;
+  const res = await sb
+    .from('tasks')
+    .update({ accepted_by: currentEmployee, status: 'ACCEPTED' })
+    .eq('id', taskId)
+    .is('accepted_by', null);
+
+  if(res.error){
+    // Fallback if status column doesn't exist
+    const res2 = await sb
+      .from('tasks')
+      .update({ accepted_by: currentEmployee })
+      .eq('id', taskId)
+      .is('accepted_by', null);
+    if(res2.error){
+      alert('Accept failed: ' + res2.error.message);
+      console.log(res2.error);
+      return;
+    }
+  }
+
+  // If no rows were updated, someone else took it
+  if(Array.isArray(res.data) && res.data.length === 0){
+    alert('Task already taken by someone else');
+  }
+  loadTasks();
+}
+
+// Reject: hide task locally; if releasing=true and accepted by me, unassign
+async function rejectTask(taskId, releasing=false){
+  const declined = _getDeclinedSet();
+  declined.add(taskId);
+  _saveDeclined(declined);
+
+  if(releasing){
+    await _safeUpdateTask(taskId, { accepted_by: null, status: 'OPEN' });
+  }
+
+  loadTasks();
+}
+
+// HR Panel: Create Task
+async function createHRTask() {
+  const title = document.getElementById('hr_task_title').value;
+  const desc = document.getElementById('hr_task_desc').value;
+  const points = Number(document.getElementById('hr_task_points').value);
+  const deadline = document.getElementById('hr_task_deadline').value;
+  if (!title || !desc || !points) {
+    alert('Fill all fields');
+    return;
+  }
+
+  let res = await sb.from('tasks').insert([{ 
+    title, 
+    description: desc, 
+    points,
+    deadline: deadline || null,
+    status: 'OPEN',
+    accepted_by: null
+  }]);
+  if(res.error && /column .*status|column .*accepted_by|column .*deadline/i.test(res.error.message || '')){
+    res = await sb.from('tasks').insert([{ title, description: desc, points }]);
+  }
+  const error = res.error;
+  if (error) {
+    alert('DB ERROR: ' + error.message);
+    return;
+  }
+  alert('Task created');
+  document.getElementById('hr_task_title').value = '';
+  document.getElementById('hr_task_desc').value = '';
+  document.getElementById('hr_task_points').value = '';
+  document.getElementById('hr_task_deadline').value = '';
+  loadHRPanelTasks();
+}
+
+// HR Panel: Load all tasks and show accepts
+async function loadHRPanelTasks() {
+  const { data } = await sb
+    .from('tasks')
+    .select('id,title,description,points,deadline,status,accepted_by,created_at')
+    .order('created_at', { ascending: false });
+
+  const empRes = await sb.from('employees').select('id,name');
+  const empMap = {};
+  (empRes.data || []).forEach(e => { empMap[e.id] = e.name; });
+
+  let html = '';
+  for (const t of (data || [])) {
+    const who = t.accepted_by ? (empMap[t.accepted_by] || t.accepted_by) : '-';
+    html += `<div class="card">
+      <b>${t.title || ''}</b> (${t.points || 0} pts)<br>
+      ${t.description || ''}<br>
+      <div style="margin-top:10px;font-size:0.98rem;color:#444;line-height:1.35">
+        Status: <b>${t.status || 'OPEN'}</b><br>
+        Accepted By: <b>${who}</b><br>
+        Deadline: <b>${_fmtDeadline(t.deadline)}</b>
+      </div>
+    </div>`;
+  }
+  document.getElementById('hrTaskList').innerHTML = html || 'No tasks yet';
+}
+
+// Call loadTasks on page load
+loadTasks();
+</script>
+
+</body>
+</html>
