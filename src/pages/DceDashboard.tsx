@@ -90,6 +90,8 @@ type AuditRecord = {
   inserted_at: string
 }
 
+type DceTab = 'Overview' | 'Documents' | 'Meetings' | 'Finance' | 'Decisions' | 'Voting' | 'Audit Log' | 'Settings'
+
 const statusOptions = ['Signed', 'Awaiting signature', 'Draft', 'Expired'] as const
 const confidentialityOptions = ['Public', 'Restricted', 'Confidential', 'Privileged'] as const
 const voteOptions = ['For', 'Against', 'Abstain'] as const
@@ -136,6 +138,11 @@ const initialExpenditureForm = {
   amount: '',
   spend_date: '',
   status: 'Pending'
+}
+
+const initialBusinessForm = {
+  name: '',
+  type: ''
 }
 
 function formatDate(value: string) {
@@ -201,6 +208,10 @@ export default function DceDashboard() {
   const [expenditureForm, setExpenditureForm] = useState(initialExpenditureForm)
   const [editingExpenditureId, setEditingExpenditureId] = useState<number | null>(null)
   const [voteSubmitting, setVoteSubmitting] = useState(false)
+  const [businessMenuOpen, setBusinessMenuOpen] = useState(false)
+  const [businessForm, setBusinessForm] = useState(initialBusinessForm)
+  const [editingBusinessId, setEditingBusinessId] = useState<string | number | null>(null)
+  const [activeTab, setActiveTab] = useState<DceTab>('Overview')
 
   useEffect(() => {
     loadBusinesses()
@@ -234,7 +245,7 @@ export default function DceDashboard() {
       { label: 'Documents under management', value: `${documents.length}`, trend: `${meetings.length} updates`, positive: true },
       { label: 'Open decisions', value: `${decisions.length}`, trend: `${meetings.length} meetings`, positive: true },
       { label: 'Pending votes', value: `${Math.max(0, decisions.length - (totalVotes ? 1 : 0))}`, trend: totalVotes ? `+${totalVotes} cast` : 'No votes', positive: totalVotes > 0 },
-      { label: 'YTD expenditure', value: `$${expenditures.reduce((sum, entry) => sum + entry.amount, 0).toLocaleString()}`, trend: expenditures.length ? '-1.2%' : 'No spend', positive: true },
+      { label: 'YTD expenditure', value: `₹${expenditures.reduce((sum, entry) => sum + entry.amount, 0).toLocaleString()}`, trend: expenditures.length ? '-1.2%' : 'No spend', positive: true },
       { label: 'Upcoming meetings', value: `${meetings.filter((item) => item.meeting_date && new Date(item.meeting_date) >= new Date()).length}`, trend: meetings.length ? `Next: ${meetings[0]?.meeting_date ?? 'none'}` : 'No meetings', positive: true }
     ],
     [documents.length, decisions.length, expenditures, meetings.length, totalVotes, meetings]
@@ -630,6 +641,641 @@ export default function DceDashboard() {
     setEditingAuditId(null)
   }
 
+  function resetBusinessForm() {
+    setBusinessForm(initialBusinessForm)
+    setEditingBusinessId(null)
+  }
+
+  async function saveBusiness() {
+    if (!businessForm.name.trim()) {
+      toast.error('Business name is required')
+      return
+    }
+    if (!businessForm.type.trim()) {
+      toast.error('Business type is required')
+      return
+    }
+    try {
+      if (editingBusinessId) {
+        const { error } = await supabase.from('businesses').update({ name: businessForm.name, type: businessForm.type }).eq('id', editingBusinessId)
+        if (error) throw error
+        toast.success('Business updated')
+      } else {
+        const { error } = await supabase.from('businesses').insert([{ name: businessForm.name, type: businessForm.type }])
+        if (error) throw error
+        toast.success('Business added')
+      }
+      resetBusinessForm()
+      loadBusinesses()
+    } catch (err: any) {
+      toast.error('Save business failed: ' + (err.message ?? err))
+    }
+  }
+
+  async function deleteBusiness(businessId: string | number) {
+    if (!confirm('Are you sure you want to delete this business?')) return
+    try {
+      const { error } = await supabase.from('businesses').delete().eq('id', businessId)
+      if (error) throw error
+      toast.success('Business deleted')
+      if (selectedBusiness?.id === businessId) {
+        setSelectedBusiness(null)
+      }
+      loadBusinesses()
+    } catch (err: any) {
+      toast.error('Delete business failed: ' + (err.message ?? err))
+    }
+  }
+
+  function editBusiness(business: Business) {
+    setEditingBusinessId(business.id)
+    setBusinessForm({ name: business.name, type: business.type })
+  }
+
+  const tabItems = [
+    { icon: LayoutDashboard, label: 'Overview' as const },
+    { icon: FileText, label: 'Documents' as const },
+    { icon: Users, label: 'Meetings' as const },
+    { icon: Briefcase, label: 'Finance' as const },
+    { icon: CheckSquare, label: 'Decisions' as const },
+    { icon: Vote, label: 'Voting' as const },
+    { icon: Activity, label: 'Audit Log' as const },
+    { icon: Settings, label: 'Settings' as const }
+  ]
+
+  function renderOverview() {
+    return (
+      <>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-4xl font-medium tracking-tight text-slate-900 mb-4" style={{ fontFamily: 'Cormorant Garamond' }}>Platform Overview</h1>
+            <p className="text-sm text-stone-500">Managing critical records across your portfolio businesses.</p>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-sm flex items-center gap-3">
+            <select value={selectedBusiness?.id ?? ''} onChange={(event) => { const id = event.target.value; const business = businesses.find((item) => item.id.toString() === id); if (business) setSelectedBusiness(business) }} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none">
+              <option value="">Select business</option>
+              {businesses.map((business) => <option key={business.id} value={business.id.toString()}>{business.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {kpis.map((kpi) => (
+            <div key={kpi.label} className="bg-white border border-stone-200 rounded-lg p-5 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-stone-100 to-transparent" />
+              <div className="text-xs font-medium uppercase tracking-wider text-stone-500 mb-3">{kpi.label}</div>
+              <div className="flex items-end justify-between">
+                <div className="text-3xl text-slate-900 tnum" style={{ fontFamily: 'Cormorant Garamond' }}>{kpi.value}</div>
+                <div className={`text-xs font-medium tnum flex items-center gap-1 ${kpi.positive ? 'text-emerald-700' : 'text-stone-600'}`}>
+                  {kpi.positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {kpi.trend}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-medium text-slate-900" style={{ fontFamily: 'Cormorant Garamond' }}>Active Resolution</h2>
+            <button type="button" className="text-emerald-700 hover:text-emerald-800 font-medium text-sm" onClick={() => setActiveTab('Audit Log')}>View audit history →</button>
+          </div>
+          <div className="bg-white border border-emerald-900/10 rounded-xl shadow-sm overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-700" />
+            <div className="p-6 pl-8">
+              <div className="flex flex-col lg:flex-row gap-8">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase tracking-wider rounded border border-amber-200/50">Requires Vote</span>
+                    <span className="text-stone-500 text-sm">Decision tracker</span>
+                  </div>
+                  <h3 className="text-xl font-medium text-slate-900 mb-4">Capital approval workflow for portfolio investments</h3>
+                  <p className="text-sm text-stone-600 leading-relaxed mb-4 max-w-3xl">Live voting support combined with document and audit tracking to keep board governance and treasury aligned.</p>
+                  <div className="flex items-center gap-3 text-xs text-stone-500">
+                    <Avatar initials="SC" />
+                    <span>Proposed by Chief Strategy</span>
+                    <Clock className="w-3 h-3" />
+                    <span>Real-time updates</span>
+                  </div>
+                </div>
+                <div className="lg:w-80 lg:border-l border-stone-100 lg:pl-8">
+                  <div className="text-sm text-stone-600 mb-4">{activeDecision ? `Decision #${activeDecision.id}` : 'No active decision selected'}</div>
+                  <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden flex border border-stone-200/50 mb-6">
+                    <div className="bg-emerald-600" style={{ width: `${totalVotes ? (voteSummary.For / totalVotes) * 100 : 0}%` }} />
+                    <div className="bg-rose-500" style={{ width: `${totalVotes ? (voteSummary.Against / totalVotes) * 100 : 0}%` }} />
+                    <div className="bg-stone-400" style={{ width: `${totalVotes ? (voteSummary.Abstain / totalVotes) * 100 : 0}%` }} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-stone-600">
+                    <div className="rounded-lg bg-emerald-50 p-3"><div className="font-semibold text-emerald-700">For</div><div>{voteSummary.For}</div></div>
+                    <div className="rounded-lg bg-rose-50 p-3"><div className="font-semibold text-rose-700">Against</div><div>{voteSummary.Against}</div></div>
+                    <div className="rounded-lg bg-stone-50 p-3"><div className="font-semibold text-stone-700">Abstain</div><div>{voteSummary.Abstain}</div></div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-3 gap-2">
+                    {voteOptions.map((option) => (
+                      <button key={option} type="button" disabled={!activeDecision || voteSubmitting} onClick={() => castVote(option)} className="rounded-md px-3 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50">{option}</button>
+                    ))}
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-xs uppercase tracking-widest text-stone-500 mb-2">Active decision</label>
+                    <select value={activeDecision?.id ?? ''} onChange={(event) => setActiveDecisionId(Number(event.target.value))} className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-slate-900">
+                      {decisions.map((decision) => <option key={decision.id} value={decision.id}>{decision.title}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function renderDocumentsTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-medium text-slate-900">Documents Vault</h1>
+          <button type="button" onClick={resetDocumentForm} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 flex items-center gap-2"><Plus className="w-4 h-4" />{editingDocumentId ? 'Reset' : 'New'}</button>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-stone-200 grid gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input value={documentForm.title} onChange={(event) => setDocumentForm({ ...documentForm, title: event.target.value })} placeholder="Title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <input value={documentForm.owner} onChange={(event) => setDocumentForm({ ...documentForm, owner: event.target.value })} placeholder="Owner" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <select value={documentForm.doc_type} onChange={(event) => setDocumentForm({ ...documentForm, doc_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                <option>Contract</option>
+                <option>Resolution</option>
+                <option>Filing</option>
+                <option>NDA</option>
+                <option>Audit</option>
+              </select>
+              <select value={documentForm.status} onChange={(event) => setDocumentForm({ ...documentForm, status: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                {statusOptions.map((status) => <option key={status}>{status}</option>)}
+              </select>
+              <select value={documentForm.confidentiality} onChange={(event) => setDocumentForm({ ...documentForm, confidentiality: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                {confidentialityOptions.map((option) => <option key={option}>{option}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-3"><button type="button" onClick={saveDocument} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDocumentId ? 'Update document' : 'Add document'}</button></div>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 border-b border-stone-200">
+              <tr>
+                <th className="px-4 py-3 font-medium text-stone-500">Title</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Type</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Status</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {documents.map((doc) => (
+                <tr key={doc.id} className="hover:bg-stone-50/80 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <FileText className="w-4 h-4 text-stone-400" />
+                      <div>
+                        <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title}</div>
+                        <div className="text-[10px] text-stone-500">{doc.business_name} • {formatDate(doc.updated_at)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-stone-600">{doc.doc_type}</td>
+                  <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button type="button" onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                    <button type="button" onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
+                  </td>
+                </tr>
+              ))}
+              {!documents.length && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No documents yet. Start by adding one above.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  function renderMeetingsTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-medium text-slate-900">Meetings & Minutes</h1>
+          <button type="button" onClick={resetMeetingForm} className="p-2 border border-stone-200 bg-white rounded-md hover:bg-stone-50"><Plus className="w-4 h-4 text-stone-600" /></button>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-stone-200">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <input value={meetingForm.title} onChange={(event) => setMeetingForm({ ...meetingForm, title: event.target.value })} placeholder="Meeting title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <input type="date" value={meetingForm.meeting_date} onChange={(event) => setMeetingForm({ ...meetingForm, meeting_date: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <select value={meetingForm.platform} onChange={(event) => setMeetingForm({ ...meetingForm, platform: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                {platforms.map((platform) => <option key={platform}>{platform}</option>)}
+              </select>
+              <input value={meetingForm.meeting_time} onChange={(event) => setMeetingForm({ ...meetingForm, meeting_time: event.target.value })} placeholder="Time" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            </div>
+            <input value={meetingForm.attendees} onChange={(event) => setMeetingForm({ ...meetingForm, attendees: event.target.value })} placeholder="Attendees (comma separated)" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <input value={meetingForm.link} onChange={(event) => setMeetingForm({ ...meetingForm, link: event.target.value })} placeholder="Meeting link" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <textarea value={meetingForm.notes} onChange={(event) => setMeetingForm({ ...meetingForm, notes: event.target.value })} rows={3} placeholder="Notes / agenda" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <button type="button" onClick={saveMeeting} className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">{editingMeetingId ? 'Update meeting' : 'Add meeting'}</button>
+          </div>
+          <div className="p-5 space-y-4">
+            {meetings.length ? meetings.map((meeting) => (
+              <div key={meeting.id} className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <div>
+                    <div className="font-medium text-slate-900">{meeting.title}</div>
+                    <div className="text-xs text-stone-500">{formatDate(meeting.meeting_date)} • {meeting.meeting_time}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => editMeeting(meeting)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => removeMeeting(meeting.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="text-xs text-stone-600 mb-3">{meeting.platform} · {meeting.attendees.join(', ')}</div>
+                <div className="text-sm text-stone-700">{meeting.notes || 'No agenda notes added.'}</div>
+                {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-emerald-700 hover:text-emerald-800">Open link</a>}
+              </div>
+            )) : <div className="text-center text-sm text-stone-500">No meetings scheduled yet.</div>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderFinanceTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-medium text-slate-900">Finance</h1>
+            <p className="text-sm text-stone-500">Track spending, vendor payments and operating capital.</p>
+          </div>
+          <button type="button" onClick={resetExpenditureForm} className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800">{editingExpenditureId ? 'Reset form' : 'New expense'}</button>
+        </div>
+        <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+            <h2 className="font-semibold text-slate-900 mb-4">Add / edit expenditure</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <input value={expenditureForm.vendor} onChange={(event) => setExpenditureForm({ ...expenditureForm, vendor: event.target.value })} placeholder="Vendor" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <select value={expenditureForm.category} onChange={(event) => setExpenditureForm({ ...expenditureForm, category: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                {categories.map((category) => <option key={category}>{category}</option>)}
+              </select>
+              <input value={expenditureForm.amount} onChange={(event) => setExpenditureForm({ ...expenditureForm, amount: event.target.value })} placeholder="Amount" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <input type="date" value={expenditureForm.spend_date} onChange={(event) => setExpenditureForm({ ...expenditureForm, spend_date: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <select value={expenditureForm.status} onChange={(event) => setExpenditureForm({ ...expenditureForm, status: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 md:col-span-2">
+                <option>Pending</option>
+                <option>Processing</option>
+                <option>Cleared</option>
+                <option>Failed</option>
+              </select>
+            </div>
+            <div className="mt-4"><button type="button" onClick={saveExpenditure} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingExpenditureId ? 'Update expenditure' : 'Add expenditure'}</button></div>
+          </div>
+          <div className="space-y-6">
+            <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+              <h2 className="font-semibold text-slate-900 mb-4">Spend by category</h2>
+              <PieChart width={320} height={240}>
+                <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={4}>
+                  {categoryData.map((entry, index) => <Cell key={entry.name} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+              </PieChart>
+            </div>
+            <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+              <h2 className="font-semibold text-slate-900 mb-4">Trend</h2>
+              <LineChart width={340} height={220} data={spendTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+                <Line type="monotone" dataKey="amount" stroke="#0f172a" strokeWidth={3} dot={false} />
+              </LineChart>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-stone-200">
+            <h2 className="text-xl font-medium text-slate-900">Recent expenditures</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            {expenditures.length ? expenditures.map((entry) => (
+              <div key={entry.id} className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <div>
+                    <div className="font-medium text-slate-900">{entry.vendor}</div>
+                    <div className="text-xs text-stone-500">{entry.category} • {formatDate(entry.spend_date)}</div>
+                  </div>
+                  <div className="text-sm font-semibold text-slate-900">₹{Number(entry.amount).toLocaleString()}</div>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs text-stone-500">
+                  <span>{entry.status}</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => editExpenditure(entry)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => removeExpenditure(entry.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              </div>
+            )) : <div className="text-center text-sm text-stone-500">No expenditures recorded yet.</div>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderDecisionsTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-medium text-slate-900">Decisions</h1>
+            <p className="text-sm text-stone-500">Review approvals, budgets, risk, and stages for your business.</p>
+          </div>
+          <button type="button" onClick={resetDecisionForm} className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800">{editingDecisionId ? 'Reset form' : 'New decision'}</button>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <div className="grid gap-3 md:grid-cols-2">
+            <input value={decisionForm.title} onChange={(event) => setDecisionForm({ ...decisionForm, title: event.target.value })} placeholder="Decision title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            <input value={decisionForm.amount} onChange={(event) => setDecisionForm({ ...decisionForm, amount: event.target.value })} placeholder="Amount" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            <input value={decisionForm.proposer} onChange={(event) => setDecisionForm({ ...decisionForm, proposer: event.target.value })} placeholder="Proposer" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            <input type="date" value={decisionForm.due_date} onChange={(event) => setDecisionForm({ ...decisionForm, due_date: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            <select value={decisionForm.risk} onChange={(event) => setDecisionForm({ ...decisionForm, risk: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+            <select value={decisionForm.stage} onChange={(event) => setDecisionForm({ ...decisionForm, stage: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+              {stageOptions.map((stage) => <option key={stage}>{stage}</option>)}
+            </select>
+          </div>
+          <div className="mt-4"><button type="button" onClick={saveDecision} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDecisionId ? 'Update decision' : 'Add decision'}</button></div>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 border-b border-stone-200">
+              <tr>
+                <th className="px-4 py-3 font-medium text-stone-500">Title</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Amount</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Proposer</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Stage</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {decisions.map((decision) => (
+                <tr key={decision.id} className="hover:bg-stone-50/80 transition-colors">
+                  <td className="px-4 py-3">{decision.title}</td>
+                  <td className="px-4 py-3">₹{Number(decision.amount).toLocaleString()}</td>
+                  <td className="px-4 py-3">{decision.proposer}</td>
+                  <td className="px-4 py-3"><RiskBadge risk={decision.risk} /></td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button type="button" onClick={() => editDecision(decision)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                    <button type="button" onClick={() => removeDecision(decision.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {!decisions.length && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-stone-500">No decisions yet. Add one above.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  function renderVotingTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-medium text-slate-900">Voting</h1>
+            <p className="text-sm text-stone-500">Cast votes on active decisions and track the vote outcome.</p>
+          </div>
+          <div className="rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+            Active decision: {activeDecision?.title ?? 'None selected'}
+          </div>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-3">Current decision</h2>
+              <p className="text-sm text-stone-600 mb-4">{activeDecision?.title ?? 'Select a decision and cast a vote.'}</p>
+              <div className="mb-4">
+                <label className="block text-xs uppercase tracking-widest text-stone-500 mb-2">Select decision</label>
+                <select value={activeDecision?.id ?? ''} onChange={(event) => setActiveDecisionId(Number(event.target.value))} className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                  <option value="">Select decision</option>
+                  {decisions.map((decision) => <option key={decision.id} value={decision.id}>{decision.title}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {voteOptions.map((option) => (
+                  <button key={option} type="button" disabled={!activeDecision || voteSubmitting} onClick={() => castVote(option)} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">{option}</button>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-3xl border border-stone-200 bg-stone-50 p-6">
+              <div className="text-xs uppercase tracking-widest text-stone-500 mb-3">Vote summary</div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-2xl bg-emerald-50 p-4">
+                  <div className="text-sm font-semibold text-emerald-700">For</div>
+                  <div className="text-2xl font-bold text-slate-900">{voteSummary.For}</div>
+                </div>
+                <div className="rounded-2xl bg-rose-50 p-4">
+                  <div className="text-sm font-semibold text-rose-700">Against</div>
+                  <div className="text-2xl font-bold text-slate-900">{voteSummary.Against}</div>
+                </div>
+                <div className="rounded-2xl bg-stone-50 p-4">
+                  <div className="text-sm font-semibold text-stone-700">Abstain</div>
+                  <div className="text-2xl font-bold text-slate-900">{voteSummary.Abstain}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">Recent votes</h2>
+          <div className="space-y-3">
+            {votes.length ? votes.map((vote) => (
+              <div key={vote.id} className="rounded-2xl border border-stone-200 bg-stone-50 p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium text-slate-900">{vote.voter}</div>
+                  <div className="text-xs text-stone-500">Decision #{vote.decision_id}</div>
+                </div>
+                <div className="rounded-full bg-white border border-stone-200 px-4 py-2 text-sm font-semibold text-slate-900">{vote.vote_option}</div>
+              </div>
+            )) : <div className="text-center text-sm text-stone-500">No votes cast yet.</div>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderAuditLogTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-medium text-slate-900">Audit Log</h1>
+            <p className="text-sm text-stone-500">Record and review important platform events.</p>
+          </div>
+          <button type="button" onClick={resetAuditForm} className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800">{editingAuditId ? 'Reset form' : 'New event'}</button>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <div className="grid gap-3 md:grid-cols-3">
+            <input value={auditForm.event_text} onChange={(event) => setAuditForm({ ...auditForm, event_text: event.target.value })} placeholder="Event description" className="md:col-span-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            <select value={auditForm.category} onChange={(event) => setAuditForm({ ...auditForm, category: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+              <option>Governance</option>
+              <option>Finance</option>
+              <option>Compliance</option>
+              <option>Operations</option>
+            </select>
+            <input value={auditForm.actor} onChange={(event) => setAuditForm({ ...auditForm, actor: event.target.value })} placeholder="Actor" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+          </div>
+          <div className="mt-4"><button type="button" onClick={saveAudit} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingAuditId ? 'Update audit event' : 'Add audit event'}</button></div>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 border-b border-stone-200">
+              <tr>
+                <th className="px-4 py-3 font-medium text-stone-500">Event</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Category</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Actor</th>
+                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {auditEvents.map((event) => (
+                <tr key={event.id} className="hover:bg-stone-50/80 transition-colors">
+                  <td className="px-4 py-3">{event.event_text}</td>
+                  <td className="px-4 py-3">{event.category}</td>
+                  <td className="px-4 py-3">{event.actor}</td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button type="button" onClick={() => { setEditingAuditId(event.id); setAuditForm({ event_text: event.event_text, category: event.category || 'Governance', actor: event.actor || '' }) }} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => removeAudit(event.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {!auditEvents.length && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No audit events recorded yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  function renderSettingsTab() {
+    return (
+      <div className="space-y-10">
+        <div>
+          <h1 className="text-3xl font-medium text-slate-900">Settings</h1>
+          <p className="text-sm text-stone-500">Manage businesses and platform information.</p>
+        </div>
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">Current business</h2>
+          {selectedBusiness ? (
+            <div className="space-y-3 text-sm text-stone-700">
+              <div><span className="font-semibold">Name:</span> {selectedBusiness.name}</div>
+              <div><span className="font-semibold">Type:</span> {selectedBusiness.type}</div>
+              <div><span className="font-semibold">Total documents:</span> {documents.length}</div>
+              <div><span className="font-semibold">Total meetings:</span> {meetings.length}</div>
+            </div>
+          ) : (
+            <div className="text-sm text-stone-500">Select a business to view settings.</div>
+          )}
+        </div>
+
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">Manage businesses</h2>
+            <button type="button" onClick={resetBusinessForm} className="text-sm text-emerald-700 hover:text-emerald-800 font-medium">{editingBusinessId ? 'Reset' : 'New business'}</button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-2">Business name</label>
+              <input value={businessForm.name} onChange={(e) => setBusinessForm({ ...businessForm, name: e.target.value })} placeholder="e.g., BURGER, DROPSHIPPING" className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-2">Business type</label>
+              <input value={businessForm.type} onChange={(e) => setBusinessForm({ ...businessForm, type: e.target.value })} placeholder="e.g., REHDI, PRODUCTS WITH ADS" className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+            </div>
+          </div>
+          <button type="button" onClick={saveBusiness} className="rounded-full bg-emerald-700 px-6 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingBusinessId ? 'Update business' : 'Add business'}</button>
+        </div>
+
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-stone-200">
+            <h2 className="text-xl font-semibold text-slate-900">All businesses</h2>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 border-b border-stone-200">
+              <tr>
+                <th className="px-6 py-3 font-medium text-stone-500">Name</th>
+                <th className="px-6 py-3 font-medium text-stone-500">Type</th>
+                <th className="px-6 py-3 font-medium text-stone-500">Documents</th>
+                <th className="px-6 py-3 font-medium text-stone-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {businesses.map((business) => {
+                const bizDocs = documents.filter((doc) => doc.business_name === business.name)
+                return (
+                  <tr key={business.id} className="hover:bg-stone-50/80 transition-colors">
+                    <td className="px-6 py-3 font-medium text-slate-900">{business.name}</td>
+                    <td className="px-6 py-3 text-stone-600">{business.type}</td>
+                    <td className="px-6 py-3 text-stone-600">{bizDocs.length}</td>
+                    <td className="px-6 py-3 space-x-2">
+                      <button type="button" onClick={() => editBusiness(business)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                      <button type="button" onClick={() => deleteBusiness(business.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!businesses.length && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-sm text-stone-500">No businesses yet. Add one above.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  function renderActiveTab() {
+    switch (activeTab) {
+      case 'Documents':
+        return renderDocumentsTab()
+      case 'Meetings':
+        return renderMeetingsTab()
+      case 'Finance':
+        return renderFinanceTab()
+      case 'Decisions':
+        return renderDecisionsTab()
+      case 'Voting':
+        return renderVotingTab()
+      case 'Audit Log':
+        return renderAuditLogTab()
+      case 'Settings':
+        return renderSettingsTab()
+      case 'Overview':
+      default:
+        return renderOverview()
+    }
+  }
+
   return (
     <div className="min-h-screen flex bg-[#FDFBF7]">
       <aside className="fixed left-0 top-0 h-full w-72 bg-[#0F172A] z-10">
@@ -644,17 +1290,12 @@ export default function DceDashboard() {
         <div className="px-4 py-6">
           <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 px-2">Platform</div>
           <nav className="space-y-1">
-            {[
-              { icon: LayoutDashboard, label: 'Overview' },
-              { icon: FileText, label: 'Documents' },
-              { icon: Users, label: 'Meetings' },
-              { icon: Briefcase, label: 'Finance' },
-              { icon: CheckSquare, label: 'Decisions' },
-              { icon: Vote, label: 'Voting' },
-              { icon: Activity, label: 'Audit Log' },
-              { icon: Settings, label: 'Settings' }
-            ].map((item) => (
-              <button key={item.label} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-slate-400 border border-transparent hover:bg-slate-800/50 hover:text-slate-100">
+            {tabItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => setActiveTab(item.label)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm border border-transparent transition-colors ${activeTab === item.label ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'}`}>
                 <item.icon className="w-4 h-4" />
                 {item.label}
               </button>
@@ -663,17 +1304,38 @@ export default function DceDashboard() {
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800/50 bg-[#0B1121]">
           <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3 px-2">Active Entity</div>
-          <div className="bg-slate-900 rounded-md border border-slate-800 hover:border-slate-700 p-3 cursor-pointer">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar initials={(selectedBusiness?.name ?? 'Halcyon Holdings').split(' ').map((n) => n[0]).join('')} size={32} />
-                <div>
-                  <div className="text-sm font-medium text-slate-100">{selectedBusiness?.name ?? 'Halcyon Holdings'}</div>
-                  <div className="text-xs text-slate-500">{businesses.length} businesses</div>
+          <div>
+            <button type="button" onClick={() => setBusinessMenuOpen((open) => !open)} className="w-full bg-slate-900 rounded-md border border-slate-800 hover:border-slate-700 p-3 text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar initials={(selectedBusiness?.name ?? 'Halcyon Holdings').split(' ').map((n) => n[0]).join('')} size={32} />
+                  <div>
+                    <div className="text-sm font-medium text-slate-100">{selectedBusiness?.name ?? 'Halcyon Holdings'}</div>
+                    <div className="text-xs text-slate-500">{businesses.length} businesses</div>
+                  </div>
                 </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${businessMenuOpen ? 'rotate-180' : ''}`} />
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </div>
+            </button>
+            {businessMenuOpen && businesses.length > 1 && (
+              <div className="mt-2 rounded-xl border border-slate-800 bg-slate-950 shadow-lg overflow-hidden">
+                {businesses.map((business) => (
+                  <button
+                    key={business.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBusiness(business)
+                      setBusinessMenuOpen(false)
+                    }}
+                    className={`w-full text-left px-4 py-3 border-b border-slate-800 last:border-b-0 ${selectedBusiness?.id === business.id ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-200 hover:bg-slate-900'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>{business.name}</div>
+                      <div className="text-[11px] text-slate-500">{business.type}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -701,196 +1363,7 @@ export default function DceDashboard() {
           </div>
         </header>
         <div className="p-8 max-w-[1600px] mx-auto space-y-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <h1 className="text-4xl font-medium tracking-tight text-slate-900 mb-4" style={{ fontFamily: 'Cormorant Garamond' }}>Platform Overview</h1>
-              <p className="text-sm text-stone-500">Managing critical records across your portfolio businesses.</p>
-            </div>
-            <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-sm flex items-center gap-3">
-              <select value={selectedBusiness?.id ?? ''} onChange={(event) => { const id = event.target.value; const business = businesses.find((item) => item.id.toString() === id); if (business) setSelectedBusiness(business) }} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none">
-                <option value="">Select business</option>
-                {businesses.map((business) => <option key={business.id} value={business.id.toString()}>{business.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {kpis.map((kpi) => (
-              <div key={kpi.label} className="bg-white border border-stone-200 rounded-lg p-5 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-stone-100 to-transparent" />
-                <div className="text-xs font-medium uppercase tracking-wider text-stone-500 mb-3">{kpi.label}</div>
-                <div className="flex items-end justify-between">
-                  <div className="text-3xl text-slate-900 tnum" style={{ fontFamily: 'Cormorant Garamond' }}>{kpi.value}</div>
-                  <div className={`text-xs font-medium tnum flex items-center gap-1 ${kpi.positive ? 'text-emerald-700' : 'text-stone-600'}`}>
-                    {kpi.positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    {kpi.trend}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-medium text-slate-900" style={{ fontFamily: 'Cormorant Garamond' }}>Active Resolution</h2>
-              <a href="#audit-log" className="text-emerald-700 hover:text-emerald-800 font-medium text-sm">View audit history →</a>
-            </div>
-            <div className="bg-white border border-emerald-900/10 rounded-xl shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-700" />
-              <div className="p-6 pl-8">
-                <div className="flex flex-col lg:flex-row gap-8">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="px-2.5 py-1 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase tracking-wider rounded border border-amber-200/50">Requires Vote</span>
-                      <span className="text-stone-500 text-sm">Decision tracker</span>
-                    </div>
-                    <h3 className="text-xl font-medium text-slate-900 mb-4">Capital approval workflow for portfolio investments</h3>
-                    <p className="text-sm text-stone-600 leading-relaxed mb-4 max-w-3xl">Live voting support combined with document and audit tracking to keep board governance and treasury aligned.</p>
-                    <div className="flex items-center gap-3 text-xs text-stone-500">
-                      <Avatar initials="SC" />
-                      <span>Proposed by Chief Strategy</span>
-                      <Clock className="w-3 h-3" />
-                      <span>Real-time updates</span>
-                    </div>
-                  </div>
-                  <div className="lg:w-80 lg:border-l border-stone-100 lg:pl-8">
-                    <div className="text-sm text-stone-600 mb-4">{activeDecision ? `Decision #${activeDecision.id}` : 'No active decision selected'}</div>
-                    <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden flex border border-stone-200/50 mb-6">
-                      <div className="bg-emerald-600" style={{ width: `${totalVotes ? (voteSummary.For / totalVotes) * 100 : 0}%` }} />
-                      <div className="bg-rose-500" style={{ width: `${totalVotes ? (voteSummary.Against / totalVotes) * 100 : 0}%` }} />
-                      <div className="bg-stone-400" style={{ width: `${totalVotes ? (voteSummary.Abstain / totalVotes) * 100 : 0}%` }} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-stone-600">
-                      <div className="rounded-lg bg-emerald-50 p-3"><div className="font-semibold text-emerald-700">For</div><div>{voteSummary.For}</div></div>
-                      <div className="rounded-lg bg-rose-50 p-3"><div className="font-semibold text-rose-700">Against</div><div>{voteSummary.Against}</div></div>
-                      <div className="rounded-lg bg-stone-50 p-3"><div className="font-semibold text-stone-700">Abstain</div><div>{voteSummary.Abstain}</div></div>
-                    </div>
-                    <div className="mt-6 grid grid-cols-3 gap-2">
-                      {voteOptions.map((option) => (
-                        <button key={option} disabled={!activeDecision || voteSubmitting} onClick={() => castVote(option)} className="rounded-md px-3 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50">{option}</button>
-                      ))}
-                    </div>
-                    <div className="mt-4">
-                      <label className="block text-xs uppercase tracking-widest text-stone-500 mb-2">Active decision</label>
-                      <select value={activeDecision?.id ?? ''} onChange={(event) => setActiveDecisionId(Number(event.target.value))} className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-slate-900">
-                        {decisions.map((decision) => <option key={decision.id} value={decision.id}>{decision.title}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-medium text-slate-900" style={{ fontFamily: 'Cormorant Garamond' }}>Documents Vault</h2>
-                <button onClick={resetDocumentForm} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 flex items-center gap-2"><Plus className="w-4 h-4" />{editingDocumentId ? 'Reset' : 'New'}</button>
-              </div>
-              <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-stone-200 grid gap-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input value={documentForm.title} onChange={(event) => setDocumentForm({ ...documentForm, title: event.target.value })} placeholder="Title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
-                    <input value={documentForm.owner} onChange={(event) => setDocumentForm({ ...documentForm, owner: event.target.value })} placeholder="Owner" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <select value={documentForm.doc_type} onChange={(event) => setDocumentForm({ ...documentForm, doc_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
-                      <option>Contract</option>
-                      <option>Resolution</option>
-                      <option>Filing</option>
-                      <option>NDA</option>
-                      <option>Audit</option>
-                    </select>
-                    <select value={documentForm.status} onChange={(event) => setDocumentForm({ ...documentForm, status: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
-                      {statusOptions.map((status) => <option key={status}>{status}</option>)}
-                    </select>
-                    <select value={documentForm.confidentiality} onChange={(event) => setDocumentForm({ ...documentForm, confidentiality: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
-                      {confidentialityOptions.map((option) => <option key={option}>{option}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex gap-3"><button onClick={saveDocument} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDocumentId ? 'Update document' : 'Add document'}</button></div>
-                </div>
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-stone-50 border-b border-stone-200">
-                    <tr>
-                      <th className="px-4 py-3 font-medium text-stone-500">Title</th>
-                      <th className="px-4 py-3 font-medium text-stone-500">Type</th>
-                      <th className="px-4 py-3 font-medium text-stone-500">Status</th>
-                      <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-stone-50/80 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-start gap-3">
-                            <FileText className="w-4 h-4 text-stone-400" />
-                            <div>
-                              <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title}</div>
-                              <div className="text-[10px] text-stone-500">{doc.business_name} • {formatDate(doc.updated_at)}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-stone-600">{doc.doc_type}</td>
-                        <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
-                        <td className="px-4 py-3 space-x-2">
-                          <button onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
-                          <button onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
-                        </td>
-                      </tr>
-                    ))}
-                    {!documents.length && (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No documents yet. Start by adding one above.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-medium text-slate-900" style={{ fontFamily: 'Cormorant Garamond' }}>Meetings & Minutes</h2>
-                <button onClick={resetMeetingForm} className="p-2 border border-stone-200 bg-white rounded-md hover:bg-stone-50"><Plus className="w-4 h-4 text-stone-600" /></button>
-              </div>
-              <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-stone-200">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <input value={meetingForm.title} onChange={(event) => setMeetingForm({ ...meetingForm, title: event.target.value })} placeholder="Meeting title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
-                    <input type="date" value={meetingForm.meeting_date} onChange={(event) => setMeetingForm({ ...meetingForm, meeting_date: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                    <select value={meetingForm.platform} onChange={(event) => setMeetingForm({ ...meetingForm, platform: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
-                      {platforms.map((platform) => <option key={platform}>{platform}</option>)}
-                    </select>
-                    <input value={meetingForm.meeting_time} onChange={(event) => setMeetingForm({ ...meetingForm, meeting_time: event.target.value })} placeholder="Time" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
-                  </div>
-                  <input value={meetingForm.attendees} onChange={(event) => setMeetingForm({ ...meetingForm, attendees: event.target.value })} placeholder="Attendees (comma separated)" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
-                  <input value={meetingForm.link} onChange={(event) => setMeetingForm({ ...meetingForm, link: event.target.value })} placeholder="Meeting link" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
-                  <textarea value={meetingForm.notes} onChange={(event) => setMeetingForm({ ...meetingForm, notes: event.target.value })} rows={3} placeholder="Notes / agenda" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
-                  <button onClick={saveMeeting} className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">{editingMeetingId ? 'Update meeting' : 'Add meeting'}</button>
-                </div>
-                <div className="p-5 space-y-4">
-                  {meetings.length ? meetings.map((meeting) => (
-                    <div key={meeting.id} className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <div>
-                          <div className="font-medium text-slate-900">{meeting.title}</div>
-                          <div className="text-xs text-stone-500">{formatDate(meeting.meeting_date)} • {meeting.meeting_time}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => editMeeting(meeting)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4" /></button>
-                          <button onClick={() => removeMeeting(meeting.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                      <div className="text-xs text-stone-600 mb-3">{meeting.platform} · {meeting.attendees.join(', ')}</div>
-                      <div className="text-sm text-stone-700">{meeting.notes || 'No agenda notes added.'}</div>
-                      {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-emerald-700 hover:text-emerald-800">Open link</a>}
-                    </div>
-                  )) : <div className="text-center text-sm text-stone-500">No meetings scheduled yet.</div>}
-                </div>
-              </div>
-            </div>
-          </div>
+          {renderActiveTab()}
         </div>
       </main>
     </div>
