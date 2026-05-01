@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogIn, Shield, ArrowRight, Eye, EyeOff, UserCheck } from 'lucide-react'
+import { LogIn, Shield, ArrowRight, Eye, EyeOff, UserCheck, FileText, FilePlus, Link as LinkIcon, ListChecks } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
@@ -16,6 +16,20 @@ export default function AdminLoginPage() {
   const [pmLoading, setPmLoading] = useState(false)
   const [pmMsg, setPmMsg] = useState('')
   const [showPmPass, setShowPmPass] = useState(false)
+
+  const [businesses, setBusinesses] = useState([])
+  const [selectedBusiness, setSelectedBusiness] = useState('')
+  const [dceData, setDceData] = useState({})
+  const [newDocName, setNewDocName] = useState('')
+  const [newDocFile, setNewDocFile] = useState(null)
+  const [newNoteTitle, setNewNoteTitle] = useState('')
+  const [newNoteText, setNewNoteText] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState(null)
+  const [editNoteText, setEditNoteText] = useState('')
+  const [newMeetingTitle, setNewMeetingTitle] = useState('')
+  const [newMeetingDate, setNewMeetingDate] = useState('')
+  const [newMeetingLink, setNewMeetingLink] = useState('')
+  const [newMeetingNotes, setNewMeetingNotes] = useState('')
 
   async function _hashPw(pw) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
@@ -135,6 +149,164 @@ export default function AdminLoginPage() {
     }
   }
 
+  const DCE_STORAGE_KEY = 'xco_dce_portal_data'
+
+  useEffect(() => {
+    async function init() {
+      const stored = window.localStorage.getItem(DCE_STORAGE_KEY)
+      if (stored) {
+        try {
+          setDceData(JSON.parse(stored))
+        } catch (e) {
+          console.warn('Failed to parse DCE storage', e)
+        }
+      }
+      await loadBusinesses()
+    }
+    init()
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(DCE_STORAGE_KEY, JSON.stringify(dceData))
+  }, [dceData])
+
+  async function loadBusinesses() {
+    try {
+      const { data, error } = await supabase.from('businesses').select('id,name,type').order('name', { ascending: true })
+      if (error) throw error
+      setBusinesses(data || [])
+    } catch (err) {
+      console.warn('Unable to load businesses', err)
+    }
+  }
+
+  const currentDce = selectedBusiness ? dceData[selectedBusiness] || { notes: [], meetings: [], documents: [] } : { notes: [], meetings: [], documents: [] }
+
+  function syncCurrentDce(data) {
+    if (!selectedBusiness) return
+    setDceData(prev => ({
+      ...prev,
+      [selectedBusiness]: data,
+    }))
+  }
+
+  function handleBusinessSelect(event) {
+    setSelectedBusiness(event.target.value)
+    setEditingNoteId(null)
+    setEditNoteText('')
+  }
+
+  function handleDocFile(event) {
+    const file = event.target.files?.[0] || null
+    setNewDocFile(file)
+    setNewDocName(file?.name || '')
+  }
+
+  function addDocument() {
+    if (!selectedBusiness) {
+      toast.error('Select a business first')
+      return
+    }
+    if (!newDocName.trim()) {
+      toast.error('Enter document title')
+      return
+    }
+    const newDoc = {
+      id: Date.now().toString(),
+      name: newDocName.trim(),
+      type: newDocFile?.type || 'document',
+      uploaded_at: new Date().toISOString(),
+      fileName: newDocFile?.name || newDocName.trim(),
+    }
+    syncCurrentDce({
+      ...currentDce,
+      documents: [newDoc, ...(currentDce.documents || [])],
+    })
+    setNewDocName('')
+    setNewDocFile(null)
+    toast.success('Document added to DCE portal')
+  }
+
+  function addNote() {
+    if (!selectedBusiness) {
+      toast.error('Select a business first')
+      return
+    }
+    if (!newNoteTitle.trim() || !newNoteText.trim()) {
+      toast.error('Note title and detail required')
+      return
+    }
+    const note = {
+      id: Date.now().toString(),
+      title: newNoteTitle.trim(),
+      text: newNoteText.trim(),
+      created_at: new Date().toISOString(),
+    }
+    syncCurrentDce({
+      ...currentDce,
+      notes: [note, ...(currentDce.notes || [])],
+    })
+    setNewNoteTitle('')
+    setNewNoteText('')
+    toast.success('Note added')
+  }
+
+  function startNoteEdit(note) {
+    setEditingNoteId(note.id)
+    setEditNoteText(note.text)
+  }
+
+  function saveNoteEdit() {
+    if (!editingNoteId) return
+    const updated = (currentDce.notes || []).map(note => note.id === editingNoteId ? { ...note, text: editNoteText } : note)
+    syncCurrentDce({ ...currentDce, notes: updated })
+    setEditingNoteId(null)
+    setEditNoteText('')
+    toast.success('Note updated')
+  }
+
+  function deleteNote(noteId) {
+    syncCurrentDce({
+      ...currentDce,
+      notes: (currentDce.notes || []).filter(note => note.id !== noteId),
+    })
+  }
+
+  function addMeeting() {
+    if (!selectedBusiness) {
+      toast.error('Select a business first')
+      return
+    }
+    if (!newMeetingTitle.trim() || !newMeetingDate.trim()) {
+      toast.error('Meeting title and date required')
+      return
+    }
+    const meeting = {
+      id: Date.now().toString(),
+      title: newMeetingTitle.trim(),
+      date: newMeetingDate,
+      link: newMeetingLink.trim(),
+      notes: newMeetingNotes.trim(),
+      created_at: new Date().toISOString(),
+    }
+    syncCurrentDce({
+      ...currentDce,
+      meetings: [meeting, ...(currentDce.meetings || [])],
+    })
+    setNewMeetingTitle('')
+    setNewMeetingDate('')
+    setNewMeetingLink('')
+    setNewMeetingNotes('')
+    toast.success('Meeting note saved')
+  }
+
+  function deleteMeeting(meetingId) {
+    syncCurrentDce({
+      ...currentDce,
+      meetings: (currentDce.meetings || []).filter(item => item.id !== meetingId),
+    })
+  }
+
   return (
     <div className="mx-auto max-w-md space-y-8 py-8">
       <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
@@ -238,6 +410,17 @@ export default function AdminLoginPage() {
             {pmMsg && <p className="text-xs text-red-500">{pmMsg}</p>}
           </motion.div>
         )}
+      </div>
+
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          type="button"
+          onClick={() => navigate('/dce')}
+          className="flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-slate-900/20 transition hover:bg-slate-800"
+        >
+          <span>Want to visit DCE?</span>
+          <ArrowRight className="h-4 w-4 transition" />
+        </button>
       </div>
     </div>
   )

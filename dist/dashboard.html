@@ -103,15 +103,6 @@
     <div id="msg"></div>
   </div>
 
-  <div class="login-popup">
-    <div class="panel-title">PM Login</div>
-    <div class="panel-sub">PM = Primary Manager</div>
-
-    <select id="pmSelect" class="login-input" style="appearance:auto"></select>
-    <button class="login-btn" onclick="pmLogin()">Enter PM Panel</button>
-    <button class="login-btn" onclick="pmLogout()" style="opacity:.9">Logout PM</button>
-    <div id="pmMsg"></div>
-  </div>
 </div>
 
 <script>
@@ -158,68 +149,7 @@ async function login(){
   }
 }
 
-function setPMMsg(text){
-  const el = document.getElementById("pmMsg");
-  if(el) el.innerText = text || "";
-}
 
-async function loadPMList(){
-  setPMMsg("");
-  const select = document.getElementById("pmSelect");
-  if(!select) return;
-  select.innerHTML = `<option value="">Loading...</option>`;
-
-  const { data, error } = await sb.from("employees").select("id,name,role");
-  if(error || !data){
-    select.innerHTML = `<option value="">Failed to load PM list</option>`;
-    setPMMsg(error?.message || "Failed to load employees");
-    return;
-  }
-
-  const pms = (data || []).filter(e => {
-    const role = String(e.role || "").toUpperCase();
-    return role === "MANAGER" || role === "PRIMARY_MANAGER" || role === "PM";
-  });
-
-  if(pms.length === 0){
-    select.innerHTML = `<option value="">No PM found</option>`;
-    setPMMsg("No employees with role MANAGER/PRIMARY_MANAGER");
-    return;
-  }
-
-  select.innerHTML = `<option value="">Select Primary Manager</option>` +
-    pms.map(e => `<option value="${e.id}">${e.name} (${e.role})</option>`).join("");
-
-  // restore selection if exists
-  const saved = localStorage.getItem("xco_pm_employee_id");
-  if(saved){
-    select.value = saved;
-  }
-}
-
-function pmLogin(){
-  setPMMsg("");
-  const select = document.getElementById("pmSelect");
-  const id = select?.value;
-  const name = select?.selectedOptions?.[0]?.textContent || "";
-  if(!id){
-    setPMMsg("Select PM");
-    return;
-  }
-  localStorage.setItem("xco_pm_employee_id", id);
-  localStorage.setItem("xco_pm_employee_label", name);
-  window.location.href = "pm.html";
-}
-
-function pmLogout(){
-  localStorage.removeItem("xco_pm_employee_id");
-  localStorage.removeItem("xco_pm_employee_label");
-  setPMMsg("PM logged out");
-  const select = document.getElementById("pmSelect");
-  if(select) select.value = "";
-}
-
-document.addEventListener("DOMContentLoaded", loadPMList);
 
 </script>
 

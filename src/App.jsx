@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
@@ -9,13 +9,15 @@ import EnquirePage from './pages/EnquirePage'
 import WorkBenefitsPage from './pages/WorkBenefitsPage'
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminPage from './pages/AdminPage'
+import DcePage from './pages/DcePage'
+import DceDashboard from './pages/DceDashboard'
 
-function Layout({ children }) {
+function Layout() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
+        <Outlet />
       </main>
       <footer className="border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
         © {new Date().getFullYear()} The X Company. All rights reserved.
@@ -28,8 +30,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{ style: { borderRadius: '1rem', fontSize: '14px' } }} />
-      <Layout>
-        <Routes>
+      <Routes>
+        <Route path="/dce" element={<DcePage />} />
+        <Route path="/dce/dashboard" element={<DceDashboard />} />
+        <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/our-work" element={<Navigate to="/#work" replace />} />
           <Route path="/partner" element={<PartnerPage />} />
@@ -38,9 +42,9 @@ export default function App() {
           <Route path="/work-benefits" element={<WorkBenefitsPage />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   )
 }

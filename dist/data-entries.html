@@ -4,43 +4,104 @@
   <title>Data Entries – The X Company</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/theme.css">
-  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body{ margin:0; }
-    .topbar{
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding: 16px 18px;
-      background: rgba(255,255,255,0.75);
-      border-bottom: 1px solid rgba(0,0,0,0.06);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{
+      font-family:'Inter', sans-serif;
+      background:#f8f9fa;
+      color:#1a1a1a;
+      min-height:100vh;
     }
-    .topbar-title{ font-weight: 800; letter-spacing: .5px; }
-    .topbar-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .topbar-actions a{ text-decoration:none; }
+    .wrap{ max-width:1200px; margin:0 auto; padding:20px 16px; }
+
+    /* Top bar */
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding-bottom:16px; border-bottom:1px solid #e5e5e5; margin-bottom:24px;
+    }
+    .topbar h1{ font-size:1.25rem; font-weight:700; }
+    .topbar .sub{ font-size:13px; color:#666; margin-top:2px; }
+    .btn-group{ display:flex; gap:8px; }
+    .btn-group button, .btn-group a{
+      padding:7px 14px; font-size:13px; font-weight:600; border:1px solid #ddd;
+      background:#fff; color:#333; border-radius:6px; cursor:pointer;
+      text-decoration:none; display:inline-block;
+    }
+    .btn-group button:hover, .btn-group a:hover{ background:#f0f0f0; }
+    .btn-group .logout{ background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+    .btn-group .logout:hover{ background:#fecaca; }
+
+    /* Sections */
+    .section{ margin-bottom:28px; }
+    .section-title{
+      font-size:15px; font-weight:700; color:#333; margin-bottom:12px;
+      padding-bottom:6px; border-bottom:1px solid #eee;
+    }
+
+    /* Form elements */
+    label{ display:block; font-size:13px; font-weight:600; color:#444; margin-bottom:4px; }
+    select, input[type="number"], input[type="text"], input[type="date"], input[type="datetime-local"]{
+      width:100%; padding:9px 12px; font-size:14px; border:1px solid #ddd;
+      border-radius:6px; background:#fff; color:#1a1a1a; outline:none;
+    }
+    select:focus, input:focus{ border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.15); }
+    .field{ margin-bottom:10px; }
+    .form-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
+
+    /* Buttons */
+    .btn{
+      display:inline-block; padding:9px 18px; font-size:14px; font-weight:600;
+      border:none; border-radius:6px; cursor:pointer; color:#fff;
+    }
+    .btn-dark{ background:#1a1a1a; }
+    .btn-dark:hover{ background:#333; }
+    .btn-blue{ background:#2563eb; }
+    .btn-blue:hover{ background:#1d4ed8; }
+    .btn-red{ background:#ef4444; }
+    .btn-red:hover{ background:#dc2626; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    /* Messages */
+    .msg{ margin-top:8px; min-height:20px; font-size:13px; font-weight:600; }
+    .msg.err{ color:#dc2626; }
+    .msg.ok{ color:#16a34a; }
+
+    /* Table */
+    table{ width:100%; border-collapse:collapse; min-width:1200px; }
+    th{ text-align:left; padding:10px 8px; border-bottom:2px solid #e5e5e5; font-size:12px; font-weight:700; color:#666; text-transform:uppercase; }
+    td{ padding:8px; border-bottom:1px solid #eee; font-size:13px; vertical-align:top; }
+    .table-wrap{ overflow-x:auto; margin-top:16px; border:1px solid #e5e5e5; border-radius:6px; background:#fff; }
+
+    /* Small inline buttons in table */
+    td button{
+      padding:5px 10px; font-size:12px; font-weight:600; border:1px solid #ddd;
+      background:#fff; color:#333; border-radius:4px; cursor:pointer;
+    }
+    td button:hover{ background:#f0f0f0; }
+    td .del-btn{ background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+    td .del-btn:hover{ background:#fecaca; }
+
     #content{ width:100%; }
   </style>
 </head>
+<body>
 
-<body class="x-theme">
-  <div class="topbar">
-    <div class="topbar-title" id="title">Data Entries</div>
-    <div class="topbar-actions">
-      <a href="/admin-login">Admin</a>
-      <button id="logoutBtn" type="button">Logout</button>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 id="title">Data Entries</h1>
+        <div class="sub">Manage all data entries</div>
+      </div>
+      <div class="btn-group">
+        <a href="/admin-login">Admin</a>
+        <button class="logout" id="logoutBtn" type="button">Logout</button>
+      </div>
     </div>
-  </div>
 
-  <div id="content"></div>
+    <div id="content"></div>
+  </div>
 
   <script>
     const sb = supabase.createClient(
@@ -59,7 +120,6 @@
     window.addEventListener("load", async () => {
       const { data } = await sb.auth.getUser();
       if(!data || !data.user){
-        // Fallback to the classic login page (if used)
         window.location.href = "dashboard.html";
         return;
       }

@@ -3,62 +3,204 @@
 <head>
   <title>PM Panel – The X Company</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .wrap{ max-width: 1100px; margin: 0 auto; padding: 22px 14px; }
-    .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-    .muted{ opacity: .75; }
-    .grid{ display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top: 14px; }
-    .card{ flex: 1 1 380px; min-width: 300px; }
-    select, input{ width:100%; }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{
+      font-family:'Inter', sans-serif;
+      background:#f8f9fa;
+      color:#1a1a1a;
+      min-height:100vh;
+    }
+    .wrap{ max-width:800px; margin:0 auto; padding:20px 16px; }
+
+    /* Top bar */
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding-bottom:16px; border-bottom:1px solid #e5e5e5; margin-bottom:24px;
+    }
+    .topbar h1{ font-size:1.25rem; font-weight:700; }
+    .topbar .sub{ font-size:13px; color:#666; margin-top:2px; }
+    .btn-group{ display:flex; gap:8px; }
+    .btn-group button{
+      padding:7px 14px; font-size:13px; font-weight:600; border:1px solid #ddd;
+      background:#fff; color:#333; border-radius:6px; cursor:pointer;
+    }
+    .btn-group button:hover{ background:#f0f0f0; }
+    .btn-group .logout{ background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+    .btn-group .logout:hover{ background:#fecaca; }
+
+    /* Sections */
+    .section{ margin-bottom:28px; }
+    .section-title{
+      font-size:15px; font-weight:700; color:#333; margin-bottom:12px;
+      padding-bottom:6px; border-bottom:1px solid #eee;
+    }
+    .section-hint{ font-size:12px; color:#888; margin-bottom:10px; }
+
+    /* Form elements */
+    label{ display:block; font-size:13px; font-weight:600; color:#444; margin-bottom:4px; }
+    select, input[type="number"], input[type="text"], input[type="date"]{
+      width:100%; padding:9px 12px; font-size:14px; border:1px solid #ddd;
+      border-radius:6px; background:#fff; color:#1a1a1a; outline:none;
+    }
+    select:focus, input:focus{ border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.15); }
+    input::placeholder{ color:#aaa; }
+    .field{ margin-bottom:10px; }
+    .row{ display:flex; gap:10px; }
+    .row > *{ flex:1; }
+
+    /* Buttons */
+    .btn{
+      display:inline-block; padding:9px 18px; font-size:14px; font-weight:600;
+      border:none; border-radius:6px; cursor:pointer; color:#fff;
+    }
+    .btn-dark{ background:#1a1a1a; }
+    .btn-dark:hover{ background:#333; }
+    .btn-blue{ background:#2563eb; }
+    .btn-blue:hover{ background:#1d4ed8; }
+    .btn-green{ background:#16a34a; }
+    .btn-green:hover{ background:#15803d; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    /* OTP step 2 box */
+    .otp-step2{
+      display:none; margin-top:12px; padding:12px;
+      border:1px solid #e5e5e5; border-radius:6px; background:#fafafa;
+    }
+    .otp-step2 .meta{ font-size:12px; color:#666; margin-bottom:6px; }
+    .otp-input{
+      font-size:1.4rem; text-align:center; letter-spacing:10px;
+      font-weight:700; font-family:monospace;
+    }
+    .timer{ font-size:12px; color:#888; margin-top:6px; }
+
+    /* Messages */
+    .msg{ margin-top:8px; min-height:20px; font-size:13px; font-weight:600; }
+    .msg.err{ color:#dc2626; }
+    .msg.ok{ color:#16a34a; }
+
+    /* Instructions */
+    .instructions{ font-size:13px; color:#666; line-height:1.7; }
+    .instructions b{ color:#444; }
   </style>
 </head>
-<body class="x-theme">
+<body>
 
   <div class="wrap">
     <div class="topbar">
       <div>
-        <h1 style="margin:0">PM Panel</h1>
-        <div class="muted" id="pmLabel">Primary Manager</div>
+        <h1>PM Panel</h1>
+        <div class="sub" id="pmLabel">Primary Manager</div>
       </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button onclick="goBack()">← Back to Login</button>
-        <button onclick="logoutPM()" style="background:#ef4444">Logout</button>
+      <div class="btn-group">
+        <button onclick="goBack()">← Back</button>
+        <button class="logout" onclick="logoutPM()">Logout</button>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <h3 style="margin-top:0;">Daily Entry</h3>
-        <label style="font-weight:600;display:block">Select Business</label>
-        <select id="bizSelect" style="margin-top:10px;padding:10px 12px;border-radius:10px;"></select>
-
-        <div style="margin-top:14px">
-          <label style="font-weight:600;display:block">Date</label>
-          <input id="rep_date" type="date">
-        </div>
-
-        <input id="rep_income" type="number" placeholder="Today Revenue (₹)" style="margin-top:12px">
-        <input id="rep_pool" type="number" placeholder="Money Taken from Pool (₹)" style="margin-top:12px">
-        <input id="rep_expense" type="number" placeholder="Today Expense (₹)" style="margin-top:12px">
-
-        <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
-          <input id="rep_profit" type="number" placeholder="Profit (₹)" disabled style="flex:1 1 180px; opacity:.85">
-          <input id="rep_loss" type="number" placeholder="Loss (₹)" disabled style="flex:1 1 180px; opacity:.85">
-        </div>
-
-        <button style="margin-top:14px" onclick="savePMDailyReport()">Save Entry</button>
-        <div id="msg" style="margin-top:12px;min-height:22px"></div>
+    <!-- Daily Entry -->
+    <div class="section">
+      <div class="section-title">Daily Entry</div>
+      <div class="field">
+        <label>Business</label>
+        <select id="bizSelect"></select>
       </div>
-
-      <div class="card">
-        <h3 style="margin-top:0;">Instructions</h3>
-        <div class="muted">
-          Chef reports you daily numbers. You enter them here.
-          Founder/Admin can see aggregated performance in Portfolio.
+      <div class="field">
+        <label>Date</label>
+        <input id="rep_date" type="date">
+      </div>
+      <div class="field">
+        <label>Revenue (₹)</label>
+        <input id="rep_income" type="number" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Expense (₹)</label>
+        <input id="rep_expense" type="number" placeholder="0">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Profit</label>
+          <input id="rep_profit" type="number" disabled style="opacity:.7">
         </div>
+        <div class="field">
+          <label>Loss</label>
+          <input id="rep_loss" type="number" disabled style="opacity:.7">
+        </div>
+      </div>
+      <button class="btn btn-dark" onclick="savePMDailyReport()">Save Entry</button>
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <!-- Money Request from Pool -->
+    <div class="section">
+      <div class="section-title">💰 Money Request from Pool</div>
+      <div class="section-hint">Enter amount → Generate OTP → Founder checks email → tells you OTP → enter & verify</div>
+      <div class="field">
+        <label>Source</label>
+        <select id="pool_req_source" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;background:#fff;">
+          <option value="CASH">Cash</option>
+          <option value="BANK">Bank</option>
+        </select>
+      </div>
+      <div class="field">
+        <input id="pool_req_amount" type="number" placeholder="Amount (₹)">
+      </div>
+      <div class="field">
+        <input id="pool_req_reason" type="text" placeholder="Reason (optional)" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;">
+      </div>
+      <button id="pool_req_genBtn" class="btn btn-blue" onclick="generateEmailOTP('request')">📧 Generate OTP</button>
+
+      <div id="pool_req_step2" class="otp-step2">
+        <div class="meta">Order: <b id="pool_req_orderId"></b> &nbsp;|&nbsp; Amount: <b id="pool_req_amountLabel"></b></div>
+        <div class="field">
+          <input id="pool_req_otp" class="otp-input" type="text" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+        </div>
+        <button class="btn btn-blue" onclick="verifyEmailOTP('request')">Verify OTP</button>
+        <div id="pool_req_timer" class="timer"></div>
+      </div>
+      <div id="pool_reqMsg" class="msg"></div>
+    </div>
+
+    <!-- Submit Money to Pool -->
+    <div class="section">
+      <div class="section-title">💸 Submit Money to Pool</div>
+      <div class="section-hint">Returning money to pool (Email OTP required)</div>
+      <div class="field">
+        <label>Deposit To</label>
+        <select id="pool_sub_source" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;background:#fff;">
+          <option value="CASH">Cash</option>
+          <option value="BANK">Bank</option>
+        </select>
+      </div>
+      <div class="field">
+        <input id="pool_sub_amount" type="number" placeholder="Amount (₹)">
+      </div>
+      <div class="field">
+        <input id="pool_sub_reason" type="text" placeholder="Reason (optional)" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;">
+      </div>
+      <button id="pool_sub_genBtn" class="btn btn-green" onclick="generateEmailOTP('submit')">📧 Generate OTP</button>
+
+      <div id="pool_sub_step2" class="otp-step2">
+        <div class="meta">Order: <b id="pool_sub_orderId"></b> &nbsp;|&nbsp; Amount: <b id="pool_sub_amountLabel"></b></div>
+        <div class="field">
+          <input id="pool_sub_otp" class="otp-input" type="text" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+        </div>
+        <button class="btn btn-green" onclick="verifyEmailOTP('submit')">Verify OTP</button>
+        <div id="pool_sub_timer" class="timer"></div>
+      </div>
+      <div id="pool_subMsg" class="msg"></div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="section">
+      <div class="section-title">Instructions</div>
+      <div class="instructions">
+        <b>Daily Entry:</b> Select business, date, revenue & expense → Save.<br>
+        <b>Money from Pool:</b> Enter amount → Generate OTP → Founder gets email with amount + OTP → ask for OTP → enter → verify.<br>
+        <b>Submit to Pool:</b> Same flow for returning money.<br>
+        <b>⏱ OTP expires in 2 min. Max 3 attempts.</b>
       </div>
     </div>
   </div>
@@ -81,6 +223,8 @@
   }
 
   async function logoutPM(){
+    localStorage.removeItem('xco_pm_employee_id');
+    localStorage.removeItem('xco_pm_employee_label');
     try { await sb.auth.signOut(); } catch(e) {}
     window.location.href = '/admin-login';
   }
@@ -107,12 +251,7 @@
   }
 
   async function loadBusinesses(){
-    let label = 'Primary Manager';
-    try {
-      const { data } = await sb.auth.getSession();
-      const email = data?.session?.user?.email;
-      if(email) label = email;
-    } catch(e) {}
+    let label = localStorage.getItem('xco_pm_employee_label') || 'Primary Manager';
     const pmLabel = document.getElementById('pmLabel');
     if(pmLabel) pmLabel.innerText = label;
 
@@ -136,7 +275,6 @@
     const businessId = document.getElementById('bizSelect')?.value;
     const date = document.getElementById('rep_date')?.value;
     const income = Number(document.getElementById('rep_income')?.value || 0);
-    const poolTaken = Number(document.getElementById('rep_pool')?.value || 0);
     const expense = Number(document.getElementById('rep_expense')?.value || 0);
 
     if(!businessId){
@@ -158,7 +296,7 @@
         p_date: date,
         p_income: income,
         p_expense: expense,
-        p_pool_taken: poolTaken,
+        p_pool_taken: 0,
       });
       if(!error){
         setMsg('Saved');
@@ -171,7 +309,10 @@
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1';
       if(isLocal){
-        const resp = await fetch('http://localhost:3000/daily-report', {
+        const BACKEND = window.location.hostname === 'localhost' ?
+        'http://localhost:3000' :
+        'https://xcompanybackend-production.up.railway.app';
+      const resp = await fetch(BACKEND + '/daily-report', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -179,7 +320,7 @@
             date,
             income,
             expense,
-            pool_taken: poolTaken,
+            pool_taken: 0,
           }),
         });
         const json = await resp.json().catch(() => ({}));
@@ -192,7 +333,7 @@
 
     // 3) Direct insert fallback
     const candidates = [
-      { business_id: businessId, report_date: date, month, income, expense, pool_taken: poolTaken, profit },
+      { business_id: businessId, report_date: date, month, income, expense, pool_taken: 0, profit },
       { business_id: businessId, month, income, expense, profit },
       { business_id: businessId, income, expense },
     ];
@@ -214,16 +355,130 @@
     setMsg(lastErr?.message || 'Save failed', true);
   }
 
-  // Guard: if PM not selected
+  // =============== EMAIL OTP POOL MONEY ===============
+  const _otpState = { request: { orderId: null, timer: null }, submit: { orderId: null, timer: null } };
+
+  function _poolMsg(prefix, text, isErr){
+    const el = document.getElementById(prefix + 'Msg');
+    if(!el) return;
+    el.innerText = text || '';
+    el.style.color = isErr ? '#dc2626' : '#16a34a';
+  }
+
+  function _startCountdown(prefix, expiresSec){
+    const timerEl = document.getElementById(prefix + '_timer');
+    let remaining = expiresSec;
+    if(_otpState[prefix === 'pool_req' ? 'request' : 'submit'].timer) clearInterval(_otpState[prefix === 'pool_req' ? 'request' : 'submit'].timer);
+    const key = prefix === 'pool_req' ? 'request' : 'submit';
+    _otpState[key].timer = setInterval(() => {
+      remaining--;
+      if(timerEl) timerEl.innerText = remaining > 0 ? `⏱ OTP expires in ${remaining}s` : '❌ OTP expired — generate new one';
+      if(remaining <= 0) clearInterval(_otpState[key].timer);
+    }, 1000);
+    if(timerEl) timerEl.innerText = `⏱ OTP expires in ${remaining}s`;
+  }
+
+  async function generateEmailOTP(type){
+    const isRequest = type === 'request';
+    const prefix = isRequest ? 'pool_req' : 'pool_sub';
+    const amount = Number(document.getElementById(prefix + '_amount')?.value || 0);
+
+    if(!amount || amount <= 0){
+      _poolMsg(prefix, 'Enter a valid amount', true);
+      return;
+    }
+
+    _poolMsg(prefix, 'Sending OTP to Founder email...');
+    const genBtn = document.getElementById(prefix + '_genBtn');
+    if(genBtn) genBtn.disabled = true;
+
+    try {
+      const BACKEND = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://xcompanybackend-production.up.railway.app';
+      const bizId = document.getElementById('bizSelect')?.value || null;
+      const pmEmpId = localStorage.getItem('xco_pm_employee_id') || null;
+
+      const source = document.getElementById(prefix + '_source')?.value || 'CASH';
+      const reason = (document.getElementById(prefix + '_reason')?.value || '').trim();
+
+      const resp = await fetch(BACKEND + '/generate-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, type, source, reason, business_id: bizId, pm_employee_id: pmEmpId }),
+      });
+
+      const json = await resp.json().catch(() => ({}));
+      if(json.ok){
+        const key = isRequest ? 'request' : 'submit';
+        _otpState[key].orderId = json.order_id;
+
+        // Show step 2
+        document.getElementById(prefix + '_step2').style.display = 'block';
+        document.getElementById(prefix + '_orderId').innerText = json.order_id;
+        document.getElementById(prefix + '_amountLabel').innerText = '₹' + amount.toLocaleString('en-IN');
+        document.getElementById(prefix + '_otp').value = '';
+
+        _poolMsg(prefix, '📧 OTP sent to Founder email! Ask Founder to check email and tell you the OTP.');
+        _startCountdown(prefix, json.expires_in || 120);
+      } else {
+        _poolMsg(prefix, json.error || 'Failed to generate OTP', true);
+      }
+    } catch(e){
+      _poolMsg(prefix, 'Backend connection failed: ' + e.message, true);
+    }
+    if(genBtn) genBtn.disabled = false;
+  }
+
+  async function verifyEmailOTP(type){
+    const isRequest = type === 'request';
+    const prefix = isRequest ? 'pool_req' : 'pool_sub';
+    const key = isRequest ? 'request' : 'submit';
+    const orderId = _otpState[key].orderId;
+    const otp = (document.getElementById(prefix + '_otp')?.value || '').trim();
+
+    if(!orderId){
+      _poolMsg(prefix, 'Generate OTP first', true);
+      return;
+    }
+    if(!otp || !/^\d{6}$/.test(otp)){
+      _poolMsg(prefix, 'Enter 6-digit OTP', true);
+      return;
+    }
+
+    _poolMsg(prefix, 'Verifying OTP...');
+
+    try {
+      const BACKEND = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://xcompanybackend-production.up.railway.app';
+      const resp = await fetch(BACKEND + '/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, code: otp }),
+      });
+
+      const json = await resp.json().catch(() => ({}));
+      if(json.ok){
+        _poolMsg(prefix, '✅ ' + (json.message || 'Success!'));
+        document.getElementById(prefix + '_step2').style.display = 'none';
+        document.getElementById(prefix + '_amount').value = '';
+        document.getElementById(prefix + '_reason').value = '';
+        _otpState[key].orderId = null;
+        if(_otpState[key].timer) clearInterval(_otpState[key].timer);
+      } else {
+        _poolMsg(prefix, json.error || 'Verification failed', true);
+      }
+    } catch(e){
+      _poolMsg(prefix, 'Backend connection failed: ' + e.message, true);
+    }
+  }
+
+  // Guard: if PM not selected (uses localStorage set by AdminLoginPage)
   (function(){
     document.addEventListener('DOMContentLoaded', async function(){
-      try {
-        const { data, error } = await sb.auth.getSession();
-        if(error || !data?.session){
-          window.location.href = '/admin-login';
-          return;
-        }
-      } catch(e) {
+      const pmId = localStorage.getItem('xco_pm_employee_id');
+      if(!pmId){
         window.location.href = '/admin-login';
         return;
       }

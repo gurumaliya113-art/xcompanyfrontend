@@ -2,86 +2,203 @@
 <html>
 <head>
   <title>Founder Login – The X Company</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body{ display:flex; align-items:center; justify-content:center; }
-    .login-popup {
-      padding: 48px 36px 36px 36px;
-      width: 350px;
-      animation: fadeIn 1.2s cubic-bezier(.77,0,.18,1) forwards;
-      transform: scale(0.95);
-      opacity: 0;
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{ height:100%; }
+    body{
+      font-family:'Inter', sans-serif;
+      color:#111827;
+      display:flex;
+      min-height:100vh;
     }
-    @keyframes fadeIn {
-      to { opacity: 1; transform: scale(1); }
+
+    /* ===== LEFT BRAND SIDE ===== */
+    .brand-side{
+      display:none;
+      width:50%;
+      background:linear-gradient(135deg, #111827, #030712, #000);
+      color:#fff;
+      padding:48px;
+      flex-direction:column;
+      justify-content:space-between;
+      position:relative;
+      overflow:hidden;
     }
-    .login-title {
-      font-size: 2.2rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: #222;
-      text-align: center;
-      margin-bottom: 18px;
-      text-shadow: 0 2px 8px #fff3;
+    .brand-side .circles{
+      position:absolute; inset:0; opacity:0.1; pointer-events:none;
     }
-    .login-desc {
-      color: #555;
-      text-align: center;
-      font-size: 1.05rem;
-      margin-bottom: 32px;
-      opacity: 0.8;
+    .brand-side .circles .c{
+      position:absolute; border:2px solid #fff; border-radius:100%;
     }
-    .login-input {
-      width: 100%;
-      padding: 14px 16px;
-      margin-bottom: 18px;
-      border-radius: 12px;
-      border: none;
-      background: #f3f4f8;
-      color: #222;
-      font-size: 1.08rem;
-      font-family: inherit;
-      box-shadow: 0 2px 8px #e2e4ea;
-      outline: none;
-      transition: background 0.2s;
+    .brand-side .circles .c1{ width:256px; height:256px; top:80px; left:80px; }
+    .brand-side .circles .c2{ width:192px; height:192px; top:160px; left:160px; }
+    .brand-side .circles .c3{ width:224px; height:224px; bottom:80px; right:80px; }
+
+    .brand-logo{
+      position:relative; z-index:10;
+      width:48px; height:48px; background:#fff; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
     }
-    .login-input:focus {
-      background: #e2e4ea;
+    .brand-logo svg{ width:32px; height:32px; color:#111827; }
+
+    .brand-content{ position:relative; z-index:10; }
+    .brand-content h1{ font-size:3rem; font-weight:700; margin-bottom:16px; line-height:1.15; }
+    .brand-content p{
+      font-size:1.125rem; color:#D1D5DB; max-width:448px; line-height:1.7;
     }
-    .login-btn {
-      width: 100%;
-      margin-top: 8px;
+
+    .brand-footer{
+      position:relative; z-index:10;
+      font-size:0.875rem; color:#9CA3AF;
     }
-    #msg {
-      color: #dc2626;
-      text-align: center;
-      margin-top: 18px;
-      font-size: 1.05rem;
-      min-height: 24px;
-      white-space: pre-line;
+
+    /* ===== RIGHT LOGIN SIDE ===== */
+    .login-side{
+      width:100%; background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      padding:32px;
     }
-    @media (max-width: 500px) {
-      .login-popup { width: 98vw; padding: 32px 8vw; }
+    .login-box{ max-width:448px; width:100%; }
+
+    .login-box h2{
+      font-size:1.875rem; font-weight:700; color:#111827; margin-bottom:8px;
+    }
+    .login-box .sub{
+      color:#4B5563; font-size:1rem; margin-bottom:8px;
+    }
+    .login-box .sub a{
+      color:#111827; font-weight:500; text-decoration:none;
+    }
+    .login-box .sub a:hover{ color:#374151; }
+    .login-box .sub-small{
+      font-size:0.875rem; color:#4B5563; margin-bottom:32px;
+    }
+
+    .form-fields{ display:flex; flex-direction:column; gap:24px; }
+    .form-fields input{
+      width:100%; padding:12px 16px; font-size:1rem; font-family:inherit;
+      border:1px solid #D1D5DB; border-radius:8px; outline:none;
+      color:#111827; background:#fff; transition:box-shadow .15s, border-color .15s;
+    }
+    .form-fields input:focus{
+      border-color:transparent;
+      box-shadow:0 0 0 2px #111827;
+    }
+    .form-fields input::placeholder{ color:#9CA3AF; }
+
+    .login-btn{
+      width:100%; padding:12px; font-size:1rem; font-weight:500;
+      font-family:inherit; color:#fff; background:#111827;
+      border:none; border-radius:8px; cursor:pointer;
+      transition:background .15s;
+    }
+    .login-btn:hover{ background:#1F2937; }
+
+    .create-link{
+      margin-top:24px; text-align:center; font-size:0.875rem; color:#4B5563;
+    }
+    .create-link a{
+      color:#111827; font-weight:500; text-decoration:none; cursor:pointer;
+    }
+    .create-link a:hover{ color:#374151; }
+
+    #msg{
+      color:#dc2626; text-align:center; margin-top:16px;
+      font-size:0.875rem; min-height:20px; white-space:pre-line;
+    }
+
+    /* Invite code field — hidden by default, shown in create mode */
+    #inviteWrap{ display:none; }
+
+    /* ===== MOBILE LOGO ===== */
+    .mobile-logo{
+      display:flex; margin-top:48px;
+      flex-direction:column; align-items:center; gap:8px;
+    }
+    .mobile-logo .icon{
+      width:32px; height:32px; background:#111827; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .mobile-logo .icon svg{ width:20px; height:20px; color:#fff; }
+    .mobile-logo span{ font-weight:700; font-size:1.25rem; color:#111827; }
+
+    /* ===== DESKTOP ===== */
+    @media(min-width:1024px){
+      .brand-side{ display:flex; }
+      .login-side{ width:50%; }
+      .mobile-logo{ display:none; }
     }
   </style>
 </head>
-<body class="x-theme">
 
-<div class="login-popup">
-  <div class="login-title">The X Company</div>
-  <div class="login-desc">Multi-Billionaire Login System<br>Welcome to the future of work.</div>
+<body>
 
-  <input id="email" class="login-input" type="email" placeholder="Email">
-  <input id="password" class="login-input" type="password" placeholder="Password">
-  <input id="invite" class="login-input" type="text" placeholder="Invite Code (for Create Account)">
+<!-- LEFT BRAND -->
+<div class="brand-side">
+  <div class="circles">
+    <div class="c c1"></div>
+    <div class="c c2"></div>
+    <div class="c c3"></div>
+  </div>
 
-  <button class="login-btn" onclick="signIn()">Sign In</button>
-  <button class="login-btn" onclick="createAccount()">Create Account</button>
+  <div class="brand-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+      <path d="M2 17L12 22L22 17" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 12L12 17L22 12" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
 
-  <div id="msg"></div>
+  <div class="brand-content">
+    <h1>Hello<br>The X-Company! 👋</h1>
+    <p>"Success is not final, failure is not fatal: it is the courage to continue that counts." – Winston Churchill</p>
+  </div>
+
+  <div class="brand-footer">© 2026 The X-Company. All rights reserved.</div>
+</div>
+
+<!-- RIGHT LOGIN FORM -->
+<div class="login-side">
+  <div class="login-box">
+    <h2 id="formTitle">Founder Login</h2>
+    <p class="sub">Don't have an account? <a id="toggleMode" onclick="toggleCreateMode()">Create a new account now.</a></p>
+    <p class="sub-small">It's FREE! Takes less than a minute.</p>
+
+    <div class="form-fields">
+      <input id="email" type="email" placeholder="khalidux@gmail.com">
+      <input id="password" type="password" placeholder="Password">
+      <div id="inviteWrap">
+        <input id="invite" type="text" placeholder="Invite Code">
+      </div>
+      <button class="login-btn" id="submitBtn" onclick="handleSubmit()">Login Now</button>
+    </div>
+
+    <div class="create-link" id="bottomLink">
+      <span>Forgot password? <a href="#">Click here</a></span>
+    </div>
+
+    <div style="margin-top:16px; text-align:center;">
+      <a href="/admin-login" style="display:inline-block; padding:10px 24px; font-size:0.875rem; font-weight:500; color:#111827; border:1px solid #D1D5DB; border-radius:8px; text-decoration:none; transition:background .15s;" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='transparent'">Go to Admin Login</a>
+    </div>
+
+    <div id="msg"></div>
+
+    <!-- MOBILE LOGO -->
+    <div class="mobile-logo">
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+          <path d="M2 17L12 22L22 17" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12L12 17L22 12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span>The X-Company</span>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -90,8 +207,24 @@ const sb = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjanh5bnVjY3BuY3dzb2dlem9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTQ1MjMsImV4cCI6MjA4NTc3MDUyM30.UJcsapv2REDm-RD4L0s3PkenmJ7NE0rHMeDVAA94qzM"
 );
 
+let isCreateMode = false;
+
 function setMsg(text){
   document.getElementById("msg").innerText = text || "";
+}
+
+function toggleCreateMode(){
+  isCreateMode = !isCreateMode;
+  document.getElementById("inviteWrap").style.display = isCreateMode ? "block" : "none";
+  document.getElementById("formTitle").innerText = isCreateMode ? "Create Account" : "Founder Login";
+  document.getElementById("submitBtn").innerText = isCreateMode ? "Create Account" : "Login Now";
+  document.getElementById("toggleMode").innerText = isCreateMode ? "Back to Login" : "Create a new account now.";
+  setMsg("");
+}
+
+function handleSubmit(){
+  if(isCreateMode) createAccount();
+  else signIn();
 }
 
 async function signIn(){
@@ -105,6 +238,7 @@ async function signIn(){
     return;
   }
 
+  localStorage.setItem("xco_founder_auth", "true");
   window.location.href = "founder.html";
 }
 
@@ -137,6 +271,7 @@ async function createAccount(){
     return;
   }
 
+  localStorage.setItem("xco_founder_auth", "true");
   window.location.href = "founder.html";
 }
 </script>
