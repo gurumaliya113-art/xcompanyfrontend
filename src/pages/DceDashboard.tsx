@@ -44,6 +44,16 @@ type DocumentRecord = {
   updated_at: string
   status: string
   confidentiality: string
+  description?: string
+  file_url?: string
+  file_type?: string
+}
+type DocumentComment = {
+  id: number
+  document_id: number
+  commenter: string
+  comment_text: string
+  inserted_at: string
 }
 type DecisionRecord = {
   id: number
@@ -90,7 +100,7 @@ type AuditRecord = {
   inserted_at: string
 }
 
-type DceTab = 'Overview' | 'Documents' | 'Meetings' | 'Finance' | 'Decisions' | 'Voting' | 'Audit Log' | 'Settings'
+type DceTab = 'Overview' | 'Inside X' | 'Documents' | 'Meetings' | 'Finance' | 'Decisions' | 'Voting' | 'Audit Log' | 'Settings'
 
 const statusOptions = ['Signed', 'Awaiting signature', 'Draft', 'Expired'] as const
 const confidentialityOptions = ['Public', 'Restricted', 'Confidential', 'Privileged'] as const
@@ -104,7 +114,10 @@ const initialDocumentForm = {
   doc_type: 'Contract',
   owner: '',
   status: 'Draft',
-  confidentiality: 'Restricted'
+  confidentiality: 'Restricted',
+  description: '',
+  file_url: '',
+  file_type: 'image'
 }
 
 const initialMeetingForm = {
@@ -194,11 +207,16 @@ export default function DceDashboard() {
   const [expenditures, setExpenditures] = useState<ExpenditureRecord[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditRecord[]>([])
   const [votes, setVotes] = useState<VoteRecord[]>([])
+  const [documentComments, setDocumentComments] = useState<DocumentComment[]>([])
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
+  const [commentText, setCommentText] = useState('')
   const [activeDecisionId, setActiveDecisionId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
   const [documentForm, setDocumentForm] = useState(initialDocumentForm)
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null)
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [uploadingDocument, setUploadingDocument] = useState(false)
   const [meetingForm, setMeetingForm] = useState(initialMeetingForm)
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
   const [decisionForm, setDecisionForm] = useState(initialDecisionForm)
@@ -209,6 +227,7 @@ export default function DceDashboard() {
   const [editingExpenditureId, setEditingExpenditureId] = useState<number | null>(null)
   const [voteSubmitting, setVoteSubmitting] = useState(false)
   const [businessMenuOpen, setBusinessMenuOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [businessForm, setBusinessForm] = useState(initialBusinessForm)
   const [editingBusinessId, setEditingBusinessId] = useState<string | number | null>(null)
   const [activeTab, setActiveTab] = useState<DceTab>('Overview')
@@ -300,6 +319,9 @@ export default function DceDashboard() {
       const meetingsResult = await supabase.from('dce_meetings').select('*').eq('business_id', businessId).order('meeting_date', { ascending: false })
       const expendituresResult = await supabase.from('dce_expenditures').select('*').eq('business_id', businessId).order('spend_date', { ascending: false })
       const auditsResult = await supabase.from('dce_audit_logs').select('*').eq('business_id', businessId).order('inserted_at', { ascending: false })
+      const commentsResult = docsResult.data?.length
+        ? await supabase.from('dce_document_comments').select('*').in('document_id', docsResult.data.map((item) => item.id))
+        : { data: [], error: null }
       const votesResult = decisionsData.length
         ? await supabase.from('dce_votes').select('*').in('decision_id', decisionsData.map((item) => item.id))
         : { data: [], error: null }
@@ -308,16 +330,23 @@ export default function DceDashboard() {
       if (meetingsResult.error) throw meetingsResult.error
       if (expendituresResult.error) throw expendituresResult.error
       if (auditsResult.error) throw auditsResult.error
+      if (commentsResult.error) throw commentsResult.error
       if (votesResult.error) throw votesResult.error
 
-      setDocuments(docsResult.data ?? [])
+      const docsData = docsResult.data ?? []
+      setDocuments(docsData)
       setMeetings((meetingsResult.data ?? []).map((item: any) => ({ ...item, attendees: item.attendees || [] })))
       setDecisions(decisionsData)
       setExpenditures(expendituresResult.data ?? [])
       setAuditEvents(auditsResult.data ?? [])
+      setDocumentComments(commentsResult.data ?? [])
       setVotes(votesResult.data ?? [])
       if (!activeDecisionId && decisionsData.length) {
         setActiveDecisionId(decisionsData[0].id)
+      }
+      if (!selectedPostId) {
+        const firstMedia = docsData.find((item) => item.file_url)
+        if (firstMedia) setSelectedPostId(firstMedia.id)
       }
     } catch (err: any) {
       toast.error('Unable to load DCE data: ' + (err.message ?? err))
@@ -326,13 +355,42 @@ export default function DceDashboard() {
     }
   }
 
+  async function uploadDocumentMedia(file: File) {
+    const bucketName = 'dce-media'
+    const safeName = file.name.replace(/\s+/g, '_')
+    const fileExt = safeName.split('.').pop()?.toLowerCase() ?? 'bin'
+    const fileType = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fileExt) ? 'image' : fileExt === 'pdf' ? 'pdf' : 'image'
+    const filePath = `documents/${selectedBusiness?.id ?? 'unknown'}/${Date.now()}-${safeName}`
+
+    const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true
+    })
+    if (uploadError) throw uploadError
+
+    const { data: urlData, error: urlError } = supabase.storage.from(bucketName).getPublicUrl(filePath)
+    if (urlError) throw urlError
+    return { publicUrl: urlData.publicUrl, fileType: fileType as 'image' | 'pdf' }
+  }
+
   async function saveDocument() {
     if (!selectedBusiness) return
     if (!documentForm.title.trim()) {
       toast.error('Document title is required')
       return
     }
+
+    setUploadingDocument(true)
     try {
+      let fileUrl = documentForm.file_url
+      let fileType = documentForm.file_type
+
+      if (mediaFile) {
+        const uploadResult = await uploadDocumentMedia(mediaFile)
+        fileUrl = uploadResult.publicUrl
+        fileType = uploadResult.fileType
+      }
+
       if (editingDocumentId) {
         const { error } = await supabase.from('dce_documents').update({
           title: documentForm.title,
@@ -340,6 +398,9 @@ export default function DceDashboard() {
           owner: documentForm.owner,
           status: documentForm.status,
           confidentiality: documentForm.confidentiality,
+          description: documentForm.description,
+          file_url: fileUrl,
+          file_type: fileType,
           updated_at: new Date().toISOString()
         }).eq('id', editingDocumentId)
         if (error) throw error
@@ -348,16 +409,22 @@ export default function DceDashboard() {
         const { error } = await supabase.from('dce_documents').insert([{ ...documentForm,
           business_id: selectedBusiness.id,
           business_name: selectedBusiness.name,
+          file_url: fileUrl,
+          file_type: fileType,
           updated_at: new Date().toISOString()
         }])
         if (error) throw error
         toast.success('Document added')
       }
+
       setDocumentForm(initialDocumentForm)
+      setMediaFile(null)
       setEditingDocumentId(null)
       loadDceData(selectedBusiness.id)
     } catch (err: any) {
       toast.error('Save document failed: ' + (err.message ?? err))
+    } finally {
+      setUploadingDocument(false)
     }
   }
 
@@ -373,6 +440,19 @@ export default function DceDashboard() {
     }
   }
 
+  async function saveDocumentComment() {
+    if (!selectedBusiness || !selectedPostId || !commentText.trim()) return
+    try {
+      const { error } = await supabase.from('dce_document_comments').insert([{ document_id: selectedPostId, commenter: 'Portal user', comment_text: commentText.trim() }])
+      if (error) throw error
+      toast.success('Comment added')
+      setCommentText('')
+      loadDceData(selectedBusiness.id)
+    } catch (err: any) {
+      toast.error('Unable to add comment: ' + (err.message ?? err))
+    }
+  }
+
   function editDocument(document: DocumentRecord) {
     setEditingDocumentId(document.id)
     setDocumentForm({
@@ -380,8 +460,12 @@ export default function DceDashboard() {
       doc_type: document.doc_type,
       owner: document.owner,
       status: document.status,
-      confidentiality: document.confidentiality
+      confidentiality: document.confidentiality,
+      description: document.description ?? '',
+      file_url: document.file_url ?? '',
+      file_type: document.file_type ?? 'image'
     })
+    setMediaFile(null)
   }
 
   async function saveMeeting() {
@@ -694,6 +778,7 @@ export default function DceDashboard() {
 
   const tabItems = [
     { icon: LayoutDashboard, label: 'Overview' as const },
+    { icon: FileText, label: 'Inside X' as const },
     { icon: FileText, label: 'Documents' as const },
     { icon: Users, label: 'Meetings' as const },
     { icon: Briefcase, label: 'Finance' as const },
@@ -702,6 +787,91 @@ export default function DceDashboard() {
     { icon: Activity, label: 'Audit Log' as const },
     { icon: Settings, label: 'Settings' as const }
   ]
+
+  function renderInsideXTab() {
+    const feedPosts = documents.filter((doc) => doc.file_url)
+    const selectedPost = feedPosts.find((post) => post.id === selectedPostId) ?? feedPosts[0]
+
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900">Inside X</h2>
+            <p className="text-sm text-stone-500">Swipe through document images and PDFs with title, description and comments.</p>
+          </div>
+          <button type="button" onClick={() => setSelectedPostId(feedPosts[0]?.id ?? null)} className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800">Refresh feed</button>
+        </div>
+
+        <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:px-0">
+          <div className="inline-grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-4">
+            {feedPosts.length ? feedPosts.map((post) => (
+              <button key={post.id} type="button" onClick={() => setSelectedPostId(post.id)} className={`min-w-[220px] rounded-3xl border ${selectedPostId === post.id ? 'border-emerald-700 bg-emerald-50' : 'border-stone-200 bg-white'} overflow-hidden text-left shadow-sm hover:shadow-lg transition`}> 
+                <div className="h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
+                  {post.file_type === 'pdf' ? (
+                    <div className="flex h-full items-center justify-center text-sm font-semibold text-stone-600">PDF</div>
+                  ) : (
+                    <img src={post.file_url} alt={post.title} className="h-full w-full object-cover" />
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="font-semibold text-slate-900 mb-2 truncate">{post.title}</div>
+                  <div className="text-sm text-stone-600 line-clamp-3">{post.description || 'No description added yet.'}</div>
+                </div>
+              </button>
+            )) : (
+              <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-sm text-stone-500 min-w-[280px]">Add document items with media URLs to populate Inside X.</div>
+            )}
+          </div>
+        </div>
+
+        {selectedPost && (
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-3xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+              <div className="h-[300px] sm:h-[360px] lg:h-[420px] bg-stone-100 flex items-center justify-center overflow-hidden">
+                {selectedPost.file_type === 'pdf' ? (
+                  <a href={selectedPost.file_url} target="_blank" rel="noreferrer" className="text-emerald-700 font-semibold">Open PDF in new tab</a>
+                ) : (
+                  <img src={selectedPost.file_url} alt={selectedPost.title} className="h-full w-full object-cover" />
+                )}
+              </div>
+              <div className="p-6">
+                <div className="text-sm text-stone-500 uppercase tracking-[0.2em] mb-2">{selectedPost.doc_type}</div>
+                <h3 className="text-2xl font-semibold text-slate-900 mb-3">{selectedPost.title}</h3>
+                <p className="text-sm text-stone-600 mb-4">{selectedPost.description || 'No description added yet for this post.'}</p>
+                <div className="text-xs text-stone-500">Uploaded: {formatDate(selectedPost.updated_at)}</div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-stone-200 bg-white shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Comments</h3>
+                  <p className="text-sm text-stone-500">Add thoughts on this item.</p>
+                </div>
+                <span className="text-xs text-stone-500">{documentComments.filter((comment) => comment.document_id === selectedPost.id).length} comments</span>
+              </div>
+              <div className="space-y-3 mb-4 max-h-72 overflow-y-auto pr-2">
+                {documentComments.filter((comment) => comment.document_id === selectedPost.id).map((comment) => (
+                  <div key={comment.id} className="rounded-2xl bg-stone-50 p-4">
+                    <div className="text-sm font-semibold text-slate-900">{comment.commenter}</div>
+                    <div className="text-sm text-stone-600">{comment.comment_text}</div>
+                    <div className="text-xs text-stone-400 mt-2">{formatDate(comment.inserted_at)}</div>
+                  </div>
+                ))}
+                {!documentComments.filter((comment) => comment.document_id === selectedPost.id).length && (
+                  <div className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-500">Be the first to comment on this piece of content.</div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} rows={3} placeholder="Write a comment..." className="w-full rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"></textarea>
+                <button type="button" onClick={saveDocumentComment} className="w-full rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Post comment</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   function renderOverview() {
     return (
@@ -816,44 +986,65 @@ export default function DceDashboard() {
                 {confidentialityOptions.map((option) => <option key={option}>{option}</option>)}
               </select>
             </div>
-            <div className="flex gap-3"><button type="button" onClick={saveDocument} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDocumentId ? 'Update document' : 'Add document'}</button></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="text-slate-700 font-medium">Upload media</span>
+                <input type="file" accept="image/*,application/pdf" onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 file:rounded-full file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-white file:font-medium file:cursor-pointer" />
+                {(mediaFile || documentForm.file_url) && (
+                  <div className="text-xs text-stone-500">
+                    {mediaFile ? `Selected file: ${mediaFile.name}` : `Using existing media from previous upload`}
+                  </div>
+                )}
+                <div className="text-xs text-stone-400">Use Supabase storage for image/PDF upload. If no file is selected, the existing media remains unchanged.</div>
+              </label>
+              <select value={documentForm.file_type} onChange={(event) => setDocumentForm({ ...documentForm, file_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                <option value="image">Image</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </div>
+            <textarea value={documentForm.description} onChange={(event) => setDocumentForm({ ...documentForm, description: event.target.value })} rows={2} placeholder="Description for Inside X" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full"></textarea>
+            <div className="flex gap-3">
+              <button type="button" onClick={saveDocument} disabled={uploadingDocument} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50">{uploadingDocument ? (editingDocumentId ? 'Updating...' : 'Adding...') : editingDocumentId ? 'Update document' : 'Add document'}</button>
+            </div>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 border-b border-stone-200">
-              <tr>
-                <th className="px-4 py-3 font-medium text-stone-500">Title</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Type</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Status</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-stone-50/80 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <FileText className="w-4 h-4 text-stone-400" />
-                      <div>
-                        <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title}</div>
-                        <div className="text-[10px] text-stone-500">{doc.business_name} • {formatDate(doc.updated_at)}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-stone-600">{doc.doc_type}</td>
-                  <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
-                  <td className="px-4 py-3 space-x-2">
-                    <button type="button" onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
-                    <button type="button" onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
-                  </td>
-                </tr>
-              ))}
-              {!documents.length && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[720px]">
+              <thead className="bg-stone-50 border-b border-stone-200">
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No documents yet. Start by adding one above.</td>
+                  <th className="px-4 py-3 font-medium text-stone-500">Title</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Type</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Status</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {documents.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-stone-50/80 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <FileText className="w-4 h-4 text-stone-400" />
+                        <div>
+                          <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title}</div>
+                          <div className="text-[10px] text-stone-500">{doc.business_name} • {formatDate(doc.updated_at)}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-stone-600">{doc.doc_type}</td>
+                    <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
+                    <td className="px-4 py-3 space-x-2">
+                      <button type="button" onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                      <button type="button" onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
+                    </td>
+                  </tr>
+                ))}
+                {!documents.length && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No documents yet. Start by adding one above.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     )
@@ -880,7 +1071,7 @@ export default function DceDashboard() {
             </div>
             <input value={meetingForm.attendees} onChange={(event) => setMeetingForm({ ...meetingForm, attendees: event.target.value })} placeholder="Attendees (comma separated)" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
             <input value={meetingForm.link} onChange={(event) => setMeetingForm({ ...meetingForm, link: event.target.value })} placeholder="Meeting link" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
-            <textarea value={meetingForm.notes} onChange={(event) => setMeetingForm({ ...meetingForm, notes: event.target.value })} rows={3} placeholder="Notes / agenda" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <textarea value={meetingForm.notes} onChange={(event) => setMeetingForm({ ...meetingForm, notes: event.target.value })} rows={3} placeholder="Notes / agenda" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full"></textarea>
             <button type="button" onClick={saveMeeting} className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">{editingMeetingId ? 'Update meeting' : 'Add meeting'}</button>
           </div>
           <div className="p-5 space-y-4">
@@ -1012,39 +1203,43 @@ export default function DceDashboard() {
               {stageOptions.map((stage) => <option key={stage}>{stage}</option>)}
             </select>
           </div>
-          <div className="mt-4"><button type="button" onClick={saveDecision} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDecisionId ? 'Update decision' : 'Add decision'}</button></div>
+          <div className="mt-4">
+            <button type="button" onClick={saveDecision} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingDecisionId ? 'Update decision' : 'Add decision'}</button>
+          </div>
         </div>
         <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 border-b border-stone-200">
-              <tr>
-                <th className="px-4 py-3 font-medium text-stone-500">Title</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Amount</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Proposer</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Stage</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {decisions.map((decision) => (
-                <tr key={decision.id} className="hover:bg-stone-50/80 transition-colors">
-                  <td className="px-4 py-3">{decision.title}</td>
-                  <td className="px-4 py-3">₹{Number(decision.amount).toLocaleString()}</td>
-                  <td className="px-4 py-3">{decision.proposer}</td>
-                  <td className="px-4 py-3"><RiskBadge risk={decision.risk} /></td>
-                  <td className="px-4 py-3 space-x-2">
-                    <button type="button" onClick={() => editDecision(decision)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
-                    <button type="button" onClick={() => removeDecision(decision.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
-              {!decisions.length && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[720px]">
+              <thead className="bg-stone-50 border-b border-stone-200">
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-stone-500">No decisions yet. Add one above.</td>
+                  <th className="px-4 py-3 font-medium text-stone-500">Title</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Amount</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Proposer</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Stage</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {decisions.map((decision) => (
+                  <tr key={decision.id} className="hover:bg-stone-50/80 transition-colors">
+                    <td className="px-4 py-3">{decision.title}</td>
+                    <td className="px-4 py-3">₹{Number(decision.amount).toLocaleString()}</td>
+                    <td className="px-4 py-3">{decision.proposer}</td>
+                    <td className="px-4 py-3"><RiskBadge risk={decision.risk} /></td>
+                    <td className="px-4 py-3 space-x-2">
+                      <button type="button" onClick={() => editDecision(decision)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                      <button type="button" onClick={() => removeDecision(decision.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+                {!decisions.length && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-stone-500">No decisions yet. Add one above.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     )
@@ -1138,37 +1333,54 @@ export default function DceDashboard() {
             </select>
             <input value={auditForm.actor} onChange={(event) => setAuditForm({ ...auditForm, actor: event.target.value })} placeholder="Actor" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
           </div>
-          <div className="mt-4"><button type="button" onClick={saveAudit} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingAuditId ? 'Update audit event' : 'Add audit event'}</button></div>
+          <div className="mt-4">
+            <button type="button" onClick={saveAudit} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingAuditId ? 'Update audit event' : 'Add audit event'}</button>
+          </div>
         </div>
         <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 border-b border-stone-200">
-              <tr>
-                <th className="px-4 py-3 font-medium text-stone-500">Event</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Category</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Actor</th>
-                <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {auditEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-stone-50/80 transition-colors">
-                  <td className="px-4 py-3">{event.event_text}</td>
-                  <td className="px-4 py-3">{event.category}</td>
-                  <td className="px-4 py-3">{event.actor}</td>
-                  <td className="px-4 py-3 space-x-2">
-                    <button type="button" onClick={() => { setEditingAuditId(event.id); setAuditForm({ event_text: event.event_text, category: event.category || 'Governance', actor: event.actor || '' }) }} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => removeAudit(event.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
-              {!auditEvents.length && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[720px]">
+              <thead className="bg-stone-50 border-b border-stone-200">
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No audit events recorded yet.</td>
+                  <th className="px-4 py-3 font-medium text-stone-500">Event</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Category</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Actor</th>
+                  <th className="px-4 py-3 font-medium text-stone-500">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {auditEvents.map((event) => (
+                  <tr key={event.id} className="hover:bg-stone-50/80 transition-colors">
+                    <td className="px-4 py-3">{event.event_text}</td>
+                    <td className="px-4 py-3">{event.category}</td>
+                    <td className="px-4 py-3">{event.actor}</td>
+                    <td className="px-4 py-3 space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAuditId(event.id)
+                          setAuditForm({
+                            event_text: event.event_text,
+                            category: event.category || 'Governance',
+                            actor: event.actor || ''
+                          })
+                        }}
+                        className="text-slate-600 hover:text-slate-900"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={() => removeAudit(event.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+                {!auditEvents.length && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No audit events recorded yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     )
@@ -1218,16 +1430,17 @@ export default function DceDashboard() {
           <div className="px-6 py-4 border-b border-stone-200">
             <h2 className="text-xl font-semibold text-slate-900">All businesses</h2>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 border-b border-stone-200">
-              <tr>
-                <th className="px-6 py-3 font-medium text-stone-500">Name</th>
-                <th className="px-6 py-3 font-medium text-stone-500">Type</th>
-                <th className="px-6 py-3 font-medium text-stone-500">Documents</th>
-                <th className="px-6 py-3 font-medium text-stone-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[720px]">
+              <thead className="bg-stone-50 border-b border-stone-200">
+                <tr>
+                  <th className="px-6 py-3 font-medium text-stone-500">Name</th>
+                  <th className="px-6 py-3 font-medium text-stone-500">Type</th>
+                  <th className="px-6 py-3 font-medium text-stone-500">Documents</th>
+                  <th className="px-6 py-3 font-medium text-stone-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
               {businesses.map((business) => {
                 const bizDocs = documents.filter((doc) => doc.business_name === business.name)
                 return (
@@ -1251,11 +1464,14 @@ export default function DceDashboard() {
           </table>
         </div>
       </div>
+    </div>
     )
   }
 
   function renderActiveTab() {
     switch (activeTab) {
+      case 'Inside X':
+        return renderInsideXTab()
       case 'Documents':
         return renderDocumentsTab()
       case 'Meetings':
@@ -1277,8 +1493,8 @@ export default function DceDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#FDFBF7]">
-      <aside className="fixed left-0 top-0 h-full w-72 bg-[#0F172A] z-10">
+    <div className="min-h-screen bg-[#FDFBF7]">
+      <aside className="hidden md:flex fixed left-0 top-0 h-full w-72 bg-[#0F172A] z-20">
         <div className="h-16 border-b border-[#1E293B] flex items-center px-4">
           <div className="w-10 h-10 rounded-sm bg-emerald-800 border border-emerald-700/50 flex items-center justify-center mr-3">
             <span className="text-emerald-200 font-serif text-lg font-bold">D</span>
@@ -1287,7 +1503,7 @@ export default function DceDashboard() {
             DCE Portal
           </div>
         </div>
-        <div className="px-4 py-6">
+        <div className="px-4 py-6 pb-32 overflow-y-auto">
           <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 px-2">Platform</div>
           <nav className="space-y-1">
             {tabItems.map((item) => (
@@ -1339,21 +1555,71 @@ export default function DceDashboard() {
           </div>
         </div>
       </aside>
-      <main className="flex-1 ml-72 flex flex-col">
-        <header className="h-16 sticky top-0 z-20 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-stone-200 px-8 flex items-center justify-between">
-          <div className="flex-1 flex items-center gap-4">
+
+      <div className={`fixed inset-0 z-40 md:hidden transition-transform ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileNavOpen(false)} />
+        <div className="relative h-full w-80 bg-[#0F172A] shadow-2xl">
+          <div className="h-16 border-b border-[#1E293B] flex items-center px-4">
+            <div className="w-10 h-10 rounded-sm bg-emerald-800 border border-emerald-700/50 flex items-center justify-center mr-3">
+              <span className="text-emerald-200 font-serif text-lg font-bold">D</span>
+            </div>
+            <div className="text-xl font-semibold tracking-wide text-slate-100" style={{ fontFamily: 'Cormorant Garamond' }}>
+              DCE Portal
+            </div>
+          </div>
+          <div className="px-4 py-6 pb-32 overflow-y-auto">
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 px-2">Platform</div>
+            <nav className="space-y-1">
+              {tabItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.label)
+                    setMobileNavOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm border border-transparent transition-colors ${activeTab === item.label ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'}`}>
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800/50 bg-[#0B1121]">
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3 px-2">Active Entity</div>
+            <div className="bg-slate-900 rounded-md p-3 text-slate-100">
+              <div className="text-sm font-medium">{selectedBusiness?.name ?? 'Halcyon Holdings'}</div>
+              <div className="text-xs text-slate-500">{selectedBusiness?.type ?? 'Business type'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <main className="flex-1 md:ml-72">
+        <header className="sticky top-0 z-30 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-stone-200 px-4 md:px-8 py-3 md:py-0 flex items-center justify-between gap-3 md:gap-6">
+          <div className="flex items-center gap-3">
+            <button type="button" className="md:hidden rounded-lg border border-stone-200 bg-white p-2 text-stone-700 shadow-sm" onClick={() => setMobileNavOpen((open) => !open)}>
+              <span className="sr-only">Open navigation</span>
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <div>
+              <div className="text-lg font-semibold text-slate-900">DCE Portal</div>
+              <div className="text-xs text-stone-500">{selectedBusiness?.name ?? 'Select a business'}</div>
+            </div>
+          </div>
+          <div className="hidden md:flex flex-1 items-center gap-4">
             <div className="relative w-full max-w-lg">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input type="text" placeholder="Search documents, meetings, decisions..." className="w-full bg-white/80 border border-stone-200 rounded-md pl-10 pr-4 py-2 text-sm shadow-sm placeholder-stone-500 focus:outline-none focus:ring-1 focus:ring-emerald-700/50 focus:border-emerald-700/50" />
             </div>
             <div className="rounded-xl border border-stone-200 bg-white px-4 py-2 shadow-sm text-sm text-stone-600">{selectedBusiness ? selectedBusiness.type : 'Select a business'}</div>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="relative">
+          <div className="flex items-center gap-3">
+            <div className="relative hidden md:block">
               <Bell className="w-5 h-5 text-stone-500 hover:text-stone-900 cursor-pointer" />
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-700 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#FDFBF7]">3</div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-slate-900">Marcus Patel</div>
                 <div className="text-xs text-stone-500">Managing Partner</div>
@@ -1362,7 +1628,22 @@ export default function DceDashboard() {
             </div>
           </div>
         </header>
-        <div className="p-8 max-w-[1600px] mx-auto space-y-10">
+        <div className="md:hidden border-b border-stone-200 bg-white/95">
+          <div className="overflow-x-auto">
+            <div className="inline-flex gap-2 px-4 py-3">
+              {tabItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => setActiveTab(item.label)}
+                  className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap ${activeTab === item.label ? 'bg-slate-900 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-10">
           {renderActiveTab()}
         </div>
       </main>
