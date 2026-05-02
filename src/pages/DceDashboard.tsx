@@ -231,6 +231,7 @@ export default function DceDashboard() {
   const [businessForm, setBusinessForm] = useState(initialBusinessForm)
   const [editingBusinessId, setEditingBusinessId] = useState<string | number | null>(null)
   const [activeTab, setActiveTab] = useState<DceTab>('Overview')
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   useEffect(() => {
     loadBusinesses()
@@ -240,6 +241,13 @@ export default function DceDashboard() {
     if (!selectedBusiness) return
     loadDceData(selectedBusiness.id)
   }, [selectedBusiness])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [])
 
   const activeDecision = useMemo(() => {
     if (!decisions.length) return null
@@ -1497,6 +1505,36 @@ export default function DceDashboard() {
       default:
         return renderOverview()
     }
+  }
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <style>{`
+          @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          .animate-slide-down {
+            animation: slideDown 1s ease-out 0.5s forwards;
+          }
+          .animate-slide-up {
+            animation: slideUp 1s ease-out 1s forwards;
+          }
+        `}</style>
+        <div className="text-center px-4">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 animate-slide-down">DCE</h1>
+          <p className="text-lg md:text-xl text-gray-300 animate-slide-up">- Where Data Meets Intelligence</p>
+          <div className="mt-8">
+            <div className="w-12 h-12 md:w-16 md:h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
