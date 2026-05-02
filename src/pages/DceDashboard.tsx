@@ -366,10 +366,16 @@ export default function DceDashboard() {
       cacheControl: '3600',
       upsert: true
     })
-    if (uploadError) throw uploadError
+    if (uploadError) {
+      console.error('DCE media upload failed', uploadError)
+      throw uploadError
+    }
 
     const { data: urlData, error: urlError } = supabase.storage.from(bucketName).getPublicUrl(filePath)
-    if (urlError) throw urlError
+    if (urlError) {
+      console.error('DCE media public URL generation failed', urlError)
+      throw urlError
+    }
     return { publicUrl: urlData.publicUrl, fileType: fileType as 'image' | 'pdf' }
   }
 
@@ -391,27 +397,27 @@ export default function DceDashboard() {
         fileType = uploadResult.fileType
       }
 
+      const documentPayload = {
+        title: documentForm.title,
+        doc_type: documentForm.doc_type,
+        owner: documentForm.owner,
+        status: documentForm.status,
+        confidentiality: documentForm.confidentiality,
+        description: documentForm.description,
+        file_url: fileUrl,
+        file_type: fileType,
+        updated_at: new Date().toISOString()
+      }
+
       if (editingDocumentId) {
-        const { error } = await supabase.from('dce_documents').update({
-          title: documentForm.title,
-          doc_type: documentForm.doc_type,
-          owner: documentForm.owner,
-          status: documentForm.status,
-          confidentiality: documentForm.confidentiality,
-          description: documentForm.description,
-          file_url: fileUrl,
-          file_type: fileType,
-          updated_at: new Date().toISOString()
-        }).eq('id', editingDocumentId)
+        const { error } = await supabase.from('dce_documents').update(documentPayload).eq('id', editingDocumentId)
         if (error) throw error
         toast.success('Document updated')
       } else {
-        const { error } = await supabase.from('dce_documents').insert([{ ...documentForm,
-          business_id: selectedBusiness.id,
-          business_name: selectedBusiness.name,
-          file_url: fileUrl,
-          file_type: fileType,
-          updated_at: new Date().toISOString()
+        const { error } = await supabase.from('dce_documents').insert([{
+          ...documentPayload,
+          business_id: String(selectedBusiness.id),
+          business_name: selectedBusiness.name
         }])
         if (error) throw error
         toast.success('Document added')
@@ -422,7 +428,8 @@ export default function DceDashboard() {
       setEditingDocumentId(null)
       loadDceData(selectedBusiness.id)
     } catch (err: any) {
-      toast.error('Save document failed: ' + (err.message ?? err))
+      console.error('Save document failed', err)
+      toast.error('Save document failed: ' + (err?.message ?? JSON.stringify(err) ?? err))
     } finally {
       setUploadingDocument(false)
     }
