@@ -25,7 +25,8 @@ import {
   FileCheck,
   Heart,
   MessageCircle,
-  Share2
+  Share2,
+  Download
 } from 'lucide-react'
 import {
   LineChart,
@@ -1292,6 +1293,10 @@ export default function DceDashboard() {
                     <MessageCircle className="w-4 h-4" />
                     Comment
                   </button>
+                  <a href={post.file_url} download className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 transition" onClick={(event) => event.stopPropagation()}>
+                    <Download className="w-4 h-4" />
+                    Download
+                  </a>
                   <button type="button" onClick={(event) => { event.stopPropagation(); handleSharePost(post) }} className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 transition">
                     <Share2 className="w-4 h-4" />
                     Share
@@ -1309,9 +1314,17 @@ export default function DceDashboard() {
             <div className="rounded-3xl border border-stone-200 bg-white shadow-sm overflow-hidden">
               <div className="h-[300px] sm:h-[360px] lg:h-[420px] bg-stone-100 flex items-center justify-center overflow-hidden">
                 {selectedPost.file_type === 'pdf' ? (
-                  <a href={selectedPost.file_url} target="_blank" rel="noreferrer" className="text-emerald-700 font-semibold">Open PDF in new tab</a>
+                  <div className="flex flex-col items-center gap-4">
+                    <a href={selectedPost.file_url} target="_blank" rel="noreferrer" className="text-emerald-700 font-semibold">Open PDF in new tab</a>
+                    <a href={selectedPost.file_url} download className="text-emerald-700 font-semibold">Download PDF</a>
+                  </div>
                 ) : (
-                  <img src={selectedPost.file_url} alt={selectedPost.title} className="h-full w-full object-cover" />
+                  <div className="relative w-full h-full">
+                    <img src={selectedPost.file_url} alt={selectedPost.title} className="h-full w-full object-cover" />
+                    <a href={selectedPost.file_url} download className="absolute top-4 right-4 bg-white/80 rounded-full p-2 text-stone-700 hover:bg-white transition">
+                      <Download className="w-5 h-5" />
+                    </a>
+                  </div>
                 )}
               </div>
               <div className="p-6">
