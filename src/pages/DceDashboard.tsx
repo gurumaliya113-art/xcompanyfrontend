@@ -89,6 +89,31 @@ type MeetingRecord = {
   notes: string
   link: string
 }
+type NoteTodoItem = {
+  id: string
+  text: string
+  done: boolean
+}
+type NoteRecord = {
+  id: string
+  title: string
+  content: string
+  todos: NoteTodoItem[]
+  reminder: string
+  deadline: string
+  highlightColor: 'none' | 'yellow' | 'green' | 'blue'
+  created_at: string
+  updated_at: string
+}
+type NoteForm = {
+  title: string
+  content: string
+  newTodo: string
+  todos: NoteTodoItem[]
+  reminder: string
+  deadline: string
+  highlightColor: NoteRecord['highlightColor']
+}
 type ExpenditureRecord = {
   id: number
   business_name: string
@@ -107,7 +132,7 @@ type AuditRecord = {
   inserted_at: string
 }
 
-type DceTab = 'Overview' | 'Inside X' | 'Documents' | 'Meetings' | 'Finance' | 'Decisions' | 'Voting' | 'Audit Log' | 'Settings'
+type DceTab = 'Overview' | 'Inside X' | 'Documents' | 'Notes' | 'Meetings' | 'Finance' | 'Decisions' | 'Voting' | 'Audit Log' | 'Settings'
 
 const statusOptions = ['Signed', 'Awaiting signature', 'Draft', 'Expired'] as const
 const confidentialityOptions = ['Public', 'Restricted', 'Confidential', 'Privileged'] as const
@@ -162,6 +187,16 @@ const initialExpenditureForm = {
   status: 'Pending'
 }
 
+const initialNoteForm: NoteForm = {
+  title: '',
+  content: '',
+  newTodo: '',
+  todos: [],
+  reminder: '',
+  deadline: '',
+  highlightColor: 'yellow'
+}
+
 const initialBusinessForm = {
   name: '',
   type: ''
@@ -174,6 +209,12 @@ function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const NOTES_STORAGE_PREFIX = 'dce_notes_v1_'
+
+function getNotesStorageKey(businessId: string | number) {
+  return `${NOTES_STORAGE_PREFIX}${businessId}`
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -236,6 +277,9 @@ export default function DceDashboard() {
   const [uploadingDocument, setUploadingDocument] = useState(false)
   const [meetingForm, setMeetingForm] = useState(initialMeetingForm)
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
+  const [notes, setNotes] = useState<NoteRecord[]>([])
+  const [noteForm, setNoteForm] = useState<NoteForm>(initialNoteForm)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [smsSending, setSmsSending] = useState(false)
   const [decisionForm, setDecisionForm] = useState(initialDecisionForm)
   const [editingDecisionId, setEditingDecisionId] = useState<number | null>(null)
@@ -276,6 +320,31 @@ export default function DceDashboard() {
     if (!selectedBusiness) return
     loadDceData(selectedBusiness.id)
   }, [selectedBusiness])
+
+  useEffect(() => {
+    if (!selectedBusiness) {
+      setNotes([])
+      setNoteForm(initialNoteForm)
+      setEditingNoteId(null)
+      return
+    }
+    const stored = window.localStorage.getItem(getNotesStorageKey(selectedBusiness.id))
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as NoteRecord[]
+        setNotes(parsed)
+      } catch {
+        setNotes([])
+      }
+    } else {
+      setNotes([])
+    }
+  }, [selectedBusiness])
+
+  useEffect(() => {
+    if (!selectedBusiness) return
+    window.localStorage.setItem(getNotesStorageKey(selectedBusiness.id), JSON.stringify(notes))
+  }, [notes, selectedBusiness])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1243,10 +1312,103 @@ export default function DceDashboard() {
     setBusinessForm({ name: business.name, type: business.type })
   }
 
+  function resetNoteForm() {
+    setNoteForm(initialNoteForm)
+    setEditingNoteId(null)
+  }
+
+  function addTodoItem() {
+    const nextText = noteForm.newTodo.trim()
+    if (!nextText) return
+    setNoteForm({
+      ...noteForm,
+      todos: [...noteForm.todos, { id: crypto.randomUUID?.() ?? `todo-${Date.now()}`, text: nextText, done: false }],
+      newTodo: ''
+    })
+  }
+
+  function toggleTodoDone(noteId: string, todoId: string) {
+    setNotes((prev) => prev.map((note) => {
+      if (note.id !== noteId) return note
+      return {
+        ...note,
+        todos: note.todos.map((todo) => todo.id === todoId ? { ...todo, done: !todo.done } : todo)
+      }
+    }))
+  }
+
+  function saveNote() {
+    const hasContent = noteForm.title.trim() || noteForm.content.trim() || noteForm.todos.length
+    if (!hasContent) {
+      toast.error('Please add a note title, content, or todo item')
+      return
+    }
+    const title = noteForm.title.trim() || 'Untitled note'
+    const content = noteForm.content.trim()
+    const now = new Date().toISOString()
+    const newNote: NoteRecord = {
+      id: editingNoteId || `note-${Date.now()}`,
+      title,
+      content,
+      todos: noteForm.todos,
+      reminder: noteForm.reminder,
+      deadline: noteForm.deadline,
+      highlightColor: noteForm.highlightColor,
+      created_at: editingNoteId ? (notes.find((item) => item.id === editingNoteId)?.created_at ?? now) : now,
+      updated_at: now
+    }
+
+    setNotes((prev) => {
+      if (editingNoteId) {
+        return prev.map((item) => item.id === editingNoteId ? newNote : item)
+      }
+      return [newNote, ...prev]
+    })
+    resetNoteForm()
+    toast.success('Note saved')
+  }
+
+  function editNote(note: NoteRecord) {
+    setEditingNoteId(note.id)
+    setNoteForm({
+      title: note.title,
+      content: note.content,
+      newTodo: '',
+      todos: note.todos,
+      reminder: note.reminder,
+      deadline: note.deadline,
+      highlightColor: note.highlightColor
+    })
+  }
+
+  function removeNote(noteId: string) {
+    setNotes((prev) => prev.filter((note) => note.id !== noteId))
+    if (editingNoteId === noteId) {
+      resetNoteForm()
+    }
+  }
+
+  const noteHighlightStyles: Record<NoteRecord['highlightColor'], string> = {
+    none: 'bg-white border-stone-200',
+    yellow: 'bg-yellow-50 border-yellow-200',
+    green: 'bg-emerald-50 border-emerald-200',
+    blue: 'bg-sky-50 border-sky-200'
+  }
+
+  const noteColorLabels: Record<NoteRecord['highlightColor'], string> = {
+    none: 'None',
+    yellow: 'Yellow',
+    green: 'Green',
+    blue: 'Blue'
+  }
+
+  const noteHighlightOptions: Array<NoteRecord['highlightColor']> = ['none', 'yellow', 'green', 'blue']
+
   const tabItems = [
     { icon: LayoutDashboard, label: 'Overview' as const },
     { icon: FileText, label: 'Inside X' as const },
     { icon: FileText, label: 'Documents' as const },
+    { icon: MessageCircle, label: 'Notes' as const },
     { icon: Users, label: 'Meetings' as const },
     { icon: Briefcase, label: 'Finance' as const },
     { icon: CheckSquare, label: 'Decisions' as const },
@@ -1697,6 +1859,113 @@ export default function DceDashboard() {
     )
   }
 
+  function renderNotesTab() {
+    return (
+      <div className="space-y-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-medium text-slate-900">Notes</h1>
+            <p className="text-sm text-stone-500">Quick notes, to-dos, reminders and deadlines for your DCE workflow.</p>
+          </div>
+          <button type="button" onClick={resetNoteForm} className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800">{editingNoteId ? 'Reset' : 'New note'}</button>
+        </div>
+
+        <div className="bg-white border border-stone-200 rounded-3xl shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-stone-200 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input value={noteForm.title} onChange={(event) => setNoteForm({ ...noteForm, title: event.target.value })} placeholder="Note title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1">Reminder</label>
+                  <input type="datetime-local" value={noteForm.reminder} onChange={(event) => setNoteForm({ ...noteForm, reminder: event.target.value })} className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1">Deadline</label>
+                  <input type="date" value={noteForm.deadline} onChange={(event) => setNoteForm({ ...noteForm, deadline: event.target.value })} className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+                </div>
+              </div>
+            </div>
+            <textarea value={noteForm.content} onChange={(event) => setNoteForm({ ...noteForm, content: event.target.value })} rows={4} placeholder="Write your note here..." className="w-full rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4 text-sm text-slate-900 resize-none" />
+
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+              <div className="grid gap-3 sm:grid-cols-[3fr_1fr]">
+                <input value={noteForm.newTodo} onChange={(event) => setNoteForm({ ...noteForm, newTodo: event.target.value })} placeholder="Add todo item" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
+                <button type="button" onClick={addTodoItem} className="rounded-2xl bg-slate-900 text-white px-4 py-3 text-sm font-semibold hover:bg-slate-800">Add todo</button>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {noteHighlightOptions.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNoteForm({ ...noteForm, highlightColor: color })}
+                    className={`h-10 rounded-2xl border ${noteForm.highlightColor === color ? 'border-slate-900 shadow-sm' : 'border-stone-200'} ${color === 'yellow' ? 'bg-amber-100' : color === 'green' ? 'bg-emerald-100' : color === 'blue' ? 'bg-sky-100' : 'bg-white'}`}
+                    title={`Highlight ${noteColorLabels[color]}`}>
+                    {color === noteForm.highlightColor ? '✓' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {noteForm.todos.length > 0 && (
+              <div className="space-y-2">
+                {noteForm.todos.map((todo) => (
+                  <label key={todo.id} className="inline-flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 w-full">
+                    <input type="checkbox" checked={todo.done} onChange={() => setNoteForm({ ...noteForm, todos: noteForm.todos.map((item) => item.id === todo.id ? { ...item, done: !item.done } : item) })} className="h-4 w-4 rounded border-stone-300 text-slate-900" />
+                    <span className={`text-sm ${todo.done ? 'line-through text-stone-400' : 'text-slate-900'}`}>{todo.text}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={saveNote} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">{editingNoteId ? 'Update note' : 'Save note'}</button>
+              <button type="button" onClick={resetNoteForm} className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {notes.length ? notes.map((note) => (
+            <article key={note.id} className={`rounded-3xl border ${noteHighlightStyles[note.highlightColor]} p-5 shadow-sm`}>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{note.title}</h2>
+                  <div className="text-xs text-stone-500">{note.updated_at ? formatDate(note.updated_at) : ''}</div>
+                </div>
+                <div className="flex items-center gap-2 text-slate-500">
+                  <button type="button" onClick={() => editNote(note)} className="rounded-full p-2 hover:bg-slate-100"><Pencil className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => removeNote(note.id)} className="rounded-full p-2 hover:bg-slate-100"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+
+              {(note.reminder || note.deadline) && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {note.reminder && <span className="rounded-full bg-slate-900 text-white px-3 py-1 text-[11px] font-semibold">Remind: {formatDate(note.reminder)}</span>}
+                  {note.deadline && <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-[11px] font-semibold">Due: {formatDate(note.deadline)}</span>}
+                </div>
+              )}
+
+              <div className="text-sm text-slate-900 whitespace-pre-wrap mb-4">{note.content || 'No additional details.'}</div>
+
+              {note.todos.length > 0 && (
+                <div className="space-y-2">
+                  {note.todos.map((todo) => (
+                    <div key={todo.id} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 py-2">
+                      <input type="checkbox" checked={todo.done} onChange={() => toggleTodoDone(note.id, todo.id)} className="h-4 w-4 rounded border-stone-300 text-slate-900" />
+                      <span className={`text-sm ${todo.done ? 'line-through text-stone-400' : 'text-slate-900'}`}>{todo.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          )) : (
+            <div className="rounded-3xl border border-stone-200 bg-stone-50 p-8 text-center text-sm text-stone-500">No notes yet. Add your first note to keep meetings and documents in one place.</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   function renderFinanceTab() {
     return (
       <div className="space-y-10">
@@ -2087,6 +2356,8 @@ export default function DceDashboard() {
       case 'Documents':
         console.log('Rendering Documents tab')
         return renderDocumentsTab()
+      case 'Notes':
+        return renderNotesTab()
       case 'Meetings':
         return renderMeetingsTab()
       case 'Finance':
