@@ -95,7 +95,9 @@ type NoteTodoItem = {
   done: boolean
 }
 type NoteRecord = {
-  id: string
+  id: number
+  business_id: string
+  business_name: string
   title: string
   content: string
   todos: NoteTodoItem[]
@@ -211,11 +213,6 @@ function formatDate(value: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const NOTES_STORAGE_PREFIX = 'dce_notes_v1_'
-
-function getNotesStorageKey(businessId: string | number) {
-  return `${NOTES_STORAGE_PREFIX}${businessId}`
-}
 
 function StatusBadge({ status }: { status: string }) {
   const configs: Record<string, { bg: string; text: string; border: string }> = {
@@ -279,7 +276,7 @@ export default function DceDashboard() {
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
   const [notes, setNotes] = useState<NoteRecord[]>([])
   const [noteForm, setNoteForm] = useState<NoteForm>(initialNoteForm)
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null)
   const [smsSending, setSmsSending] = useState(false)
   const [decisionForm, setDecisionForm] = useState(initialDecisionForm)
   const [editingDecisionId, setEditingDecisionId] = useState<number | null>(null)
@@ -326,25 +323,8 @@ export default function DceDashboard() {
       setNotes([])
       setNoteForm(initialNoteForm)
       setEditingNoteId(null)
-      return
-    }
-    const stored = window.localStorage.getItem(getNotesStorageKey(selectedBusiness.id))
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as NoteRecord[]
-        setNotes(parsed)
-      } catch {
-        setNotes([])
-      }
-    } else {
-      setNotes([])
     }
   }, [selectedBusiness])
-
-  useEffect(() => {
-    if (!selectedBusiness) return
-    window.localStorage.setItem(getNotesStorageKey(selectedBusiness.id), JSON.stringify(notes))
-  }, [notes, selectedBusiness])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -518,6 +498,7 @@ export default function DceDashboard() {
       const meetingsResult = await supabase.from('dce_meetings').select('*').eq('business_id', businessId).order('meeting_date', { ascending: false })
       const expendituresResult = await supabase.from('dce_expenditures').select('*').eq('business_id', businessId).order('spend_date', { ascending: false })
       const auditsResult = await supabase.from('dce_audit_logs').select('*').eq('business_id', businessId).order('inserted_at', { ascending: false })
+      const notesResult = await supabase.from('dce_notes').select('*').eq('business_id', businessId).order('updated_at', { ascending: false })
       const commentsResult = docsResult.data?.length
         ? await supabase.from('dce_document_comments').select('*').in('document_id', docsResult.data.map((item) => item.id))
         : { data: [], error: null }
@@ -529,6 +510,7 @@ export default function DceDashboard() {
       if (meetingsResult.error) throw meetingsResult.error
       if (expendituresResult.error) throw expendituresResult.error
       if (auditsResult.error) throw auditsResult.error
+      if (notesResult.error) throw notesResult.error
       if (commentsResult.error) throw commentsResult.error
       if (votesResult.error) throw votesResult.error
 
@@ -538,6 +520,7 @@ export default function DceDashboard() {
       setDecisions(decisionsData)
       setExpenditures(expendituresResult.data ?? [])
       setAuditEvents(auditsResult.data ?? [])
+      setNotes(notesResult.data as NoteRecord[] ?? [])
       setDocumentComments(commentsResult.data ?? [])
       setVotes(votesResult.data ?? [])
       if (!activeDecisionId && decisionsData.length) {
@@ -1327,7 +1310,7 @@ export default function DceDashboard() {
     })
   }
 
-  function toggleTodoDone(noteId: string, todoId: string) {
+  function toggleTodoDone(noteId: number, todoId: string) {
     setNotes((prev) => prev.map((note) => {
       if (note.id !== noteId) return note
       return {
@@ -1337,35 +1320,52 @@ export default function DceDashboard() {
     }))
   }
 
-  function saveNote() {
+  async function saveNote() {
+    if (!selectedBusiness) {
+      toast.error('Please select a business first')
+      return
+    }
+
     const hasContent = noteForm.title.trim() || noteForm.content.trim() || noteForm.todos.length
     if (!hasContent) {
       toast.error('Please add a note title, content, or todo item')
       return
     }
+
     const title = noteForm.title.trim() || 'Untitled note'
     const content = noteForm.content.trim()
-    const now = new Date().toISOString()
-    const newNote: NoteRecord = {
-      id: editingNoteId || `note-${Date.now()}`,
+    const payload = {
+      business_id: String(selectedBusiness.id),
+      business_name: selectedBusiness.name,
       title,
       content,
       todos: noteForm.todos,
       reminder: noteForm.reminder,
       deadline: noteForm.deadline,
-      highlightColor: noteForm.highlightColor,
-      created_at: editingNoteId ? (notes.find((item) => item.id === editingNoteId)?.created_at ?? now) : now,
-      updated_at: now
+      highlight_color: noteForm.highlightColor
     }
 
-    setNotes((prev) => {
+    try {
+      setLoading(true)
       if (editingNoteId) {
-        return prev.map((item) => item.id === editingNoteId ? newNote : item)
+        const { data, error } = await supabase.from('dce_notes').update(payload).eq('id', editingNoteId).select().single()
+        if (error) throw error
+
+        setNotes((prev) => prev.map((item) => item.id === editingNoteId ? { ...item, ...(data as NoteRecord) } : item))
+        toast.success('Note updated')
+      } else {
+        const { data, error } = await supabase.from('dce_notes').insert([payload]).select().single()
+        if (error) throw error
+
+        setNotes((prev) => [{ ...(data as NoteRecord) }, ...prev])
+        toast.success('Note saved')
       }
-      return [newNote, ...prev]
-    })
-    resetNoteForm()
-    toast.success('Note saved')
+      resetNoteForm()
+    } catch (err: any) {
+      toast.error('Unable to save note: ' + (err.message ?? err))
+    } finally {
+      setLoading(false)
+    }
   }
 
   function editNote(note: NoteRecord) {
@@ -1381,10 +1381,20 @@ export default function DceDashboard() {
     })
   }
 
-  function removeNote(noteId: string) {
-    setNotes((prev) => prev.filter((note) => note.id !== noteId))
-    if (editingNoteId === noteId) {
-      resetNoteForm()
+  async function removeNote(noteId: number) {
+    try {
+      setLoading(true)
+      const { error } = await supabase.from('dce_notes').delete().eq('id', noteId)
+      if (error) throw error
+      setNotes((prev) => prev.filter((note) => note.id !== noteId))
+      if (editingNoteId === noteId) {
+        resetNoteForm()
+      }
+      toast.success('Note removed')
+    } catch (err: any) {
+      toast.error('Unable to remove note: ' + (err.message ?? err))
+    } finally {
+      setLoading(false)
     }
   }
 
