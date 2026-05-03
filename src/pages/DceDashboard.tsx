@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { createWorker } from 'tesseract.js'
+import { jsPDF } from 'jspdf'
 import {
   LayoutDashboard,
   FileText,
@@ -20,7 +22,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Shield,
-  FileCheck
+  FileCheck,
+  Heart,
+  MessageCircle,
+  Share2
 } from 'lucide-react'
 import {
   LineChart,
@@ -79,6 +84,7 @@ type MeetingRecord = {
   meeting_time: string
   platform: string
   attendees: string[]
+  notify_numbers?: string
   notes: string
   link: string
 }
@@ -126,6 +132,8 @@ const initialMeetingForm = {
   meeting_time: '',
   platform: 'Zoom',
   attendees: '',
+  notify_numbers: '',
+  notify_members: false,
   link: '',
   notes: ''
 }
@@ -157,6 +165,8 @@ const initialBusinessForm = {
   name: '',
   type: ''
 }
+
+const DCE_PASSCODE = import.meta.env.VITE_DCE_PASSCODE?.trim() || '1234'
 
 function formatDate(value: string) {
   if (!value) return ''
@@ -212,6 +222,12 @@ export default function DceDashboard() {
   const [commentText, setCommentText] = useState('')
   const [activeDecisionId, setActiveDecisionId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [likedPostIds, setLikedPostIds] = useState<Set<string | number>>(new Set())
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const [notificationModalOpen, setNotificationModalOpen] = useState(false)
+  const [selectedDecisionForNotif, setSelectedDecisionForNotif] = useState<DecisionRecord | null>(null)
+  const [notificationEmails, setNotificationEmails] = useState('')
+  const [sendingNotification, setSendingNotification] = useState(false)
 
   const [documentForm, setDocumentForm] = useState(initialDocumentForm)
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null)
@@ -219,6 +235,7 @@ export default function DceDashboard() {
   const [uploadingDocument, setUploadingDocument] = useState(false)
   const [meetingForm, setMeetingForm] = useState(initialMeetingForm)
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
+  const [smsSending, setSmsSending] = useState(false)
   const [decisionForm, setDecisionForm] = useState(initialDecisionForm)
   const [editingDecisionId, setEditingDecisionId] = useState<number | null>(null)
   const [auditForm, setAuditForm] = useState(initialAuditForm)
@@ -232,9 +249,26 @@ export default function DceDashboard() {
   const [editingBusinessId, setEditingBusinessId] = useState<string | number | null>(null)
   const [activeTab, setActiveTab] = useState<DceTab>('Overview')
   const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [showDceIntro, setShowDceIntro] = useState(true)
+  const [passcodeVerified, setPasscodeVerified] = useState(false)
+  const [passcodeInput, setPasscodeInput] = useState('')
+  const [passcodeError, setPasscodeError] = useState('')
+  const [handwrittenImage, setHandwrittenImage] = useState<File | null>(null)
+  const [pendingHandwrittenPdfBlob, setPendingHandwrittenPdfBlob] = useState<Blob | null>(null)
+  const [handwrittenPdfUrl, setHandwrittenPdfUrl] = useState<string | null>(null)
+  const [ocrProgress, setOcrProgress] = useState<string>('')
+  const [ocrPercent, setOcrPercent] = useState<number | null>(null)
+  const [ocrResultText, setOcrResultText] = useState<string>('')
+  const [ocrProcessing, setOcrProcessing] = useState<boolean>(false)
+  const [ocrFileInput, setOcrFileInput] = useState<File | null>(null)
 
   useEffect(() => {
     loadBusinesses()
+  }, [])
+
+  useEffect(() => {
+    const introTimer = window.setTimeout(() => setShowDceIntro(false), 2200)
+    return () => window.clearTimeout(introTimer)
   }, [])
 
   useEffect(() => {
@@ -315,6 +349,93 @@ export default function DceDashboard() {
     }
   }
 
+  function handleLogout() {
+    setPasscodeVerified(false)
+    setPasscodeInput('')
+    setPasscodeError('')
+  }
+
+  function handleToggleLike(postId: string | number) {
+    setLikedPostIds((current) => {
+      const updated = new Set(current)
+      if (updated.has(postId)) {
+        updated.delete(postId)
+      } else {
+        updated.add(postId)
+      }
+      return updated
+    })
+  }
+
+  async function handleSharePost(post: DocumentRecord) {
+    const url = `${window.location.origin}${window.location.pathname}?post=${post.id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Share link copied to clipboard')
+    } catch (err) {
+      toast.error('Unable to copy share link')
+    }
+  }
+
+  function handleCommentAction(postId: string | number) {
+    setSelectedPostId(postId)
+    setTimeout(() => commentInputRef.current?.focus(), 120)
+  }
+
+  async function sendDecisionNotification() {
+    if (!selectedDecisionForNotif || !notificationEmails.trim()) {
+      toast.error('Please select a decision and enter email addresses')
+      return
+    }
+    setSendingNotification(true)
+    try {
+      const emails = notificationEmails.split(',').map((e) => e.trim()).filter((e) => e)
+      if (!emails.length) throw new Error('No valid email addresses')
+      
+      const response = await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decision: selectedDecisionForNotif,
+          emails: emails,
+          business: selectedBusiness
+        })
+      })
+      
+      if (!response.ok) throw new Error('Failed to send notification')
+      
+      toast.success(`Notification sent to ${emails.length} recipient(s)`)
+      setNotificationEmails('')
+      setNotificationModalOpen(false)
+      setSelectedDecisionForNotif(null)
+    } catch (err: any) {
+      toast.error('Send notification failed: ' + (err.message ?? err))
+    } finally {
+      setSendingNotification(false)
+    }
+  }
+
+  function handlePasscodeInput(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 4)
+    setPasscodeInput(digits)
+    if (digits.length === 4) {
+      verifyPasscode(digits)
+    }
+  }
+
+  function verifyPasscode(value: string = passcodeInput) {
+    if (value === DCE_PASSCODE) {
+      setPasscodeVerified(true)
+      setPasscodeError('')
+      if (!selectedBusiness && businesses.length) {
+        setSelectedBusiness(businesses[0])
+      }
+      return true
+    }
+    setPasscodeError('Incorrect passcode. Try again.')
+    return false
+  }
+
   async function loadDceData(businessId: string | number) {
     if (!selectedBusiness) return
     setLoading(true)
@@ -363,6 +484,272 @@ export default function DceDashboard() {
     }
   }
 
+  async function createPdfBlobFromText(text: string) {
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 40
+    const lineHeight = 16
+    const lines = pdf.splitTextToSize(text || 'No text extracted from the handwritten note.', pageWidth - margin * 2)
+
+    let cursorY = margin
+    pdf.setFontSize(12)
+    pdf.text('Handwritten Note OCR Output', margin, cursorY)
+    cursorY += lineHeight * 2
+
+    for (const line of lines) {
+      if (cursorY > pageHeight - margin) {
+        pdf.addPage()
+        cursorY = margin
+      }
+      pdf.text(line, margin, cursorY)
+      cursorY += lineHeight
+    }
+
+    return pdf.output('blob')
+  }
+
+  function updateOcrStatus(m: any) {
+    const progressValue = typeof m.progress === 'number' ? Math.min(100, Math.max(0, Math.round(m.progress * 100))) : null
+    const status = typeof m.status === 'string'
+      ? `${m.status.charAt(0).toUpperCase()}${m.status.slice(1)}`
+      : typeof m.task === 'string'
+        ? `${m.task.charAt(0).toUpperCase()}${m.task.slice(1)}`
+        : 'OCR'
+    const progressLabel = progressValue != null ? ` (${progressValue}%)` : '...'
+
+    setOcrProgress(`${status}${progressLabel}`)
+    if (progressValue != null && progressValue > 0) {
+      setOcrPercent(progressValue)
+    }
+  }
+
+  async function addFromOcr(file: File) {
+    const startTime = performance.now()
+    setOcrProcessing(true)
+    setOcrProgress('Initializing OCR...')
+    setOcrPercent(0)
+    setOcrResultText('')
+    let fallbackInterval: number | null = null
+    let worker: any = null
+
+    try {
+      fallbackInterval = window.setInterval(() => {
+        setOcrPercent((prev) => {
+          const next = (prev ?? 0) + Math.random() * 5 + 1
+          return Math.min(95, next)
+        })
+      }, 1000)
+
+      worker = await createWorker({
+        logger: (m) => {
+          console.log('Tesseract:', m)
+          updateOcrStatus(m)
+        }
+      })
+
+      await worker.load()
+      await worker.loadLanguage('eng')
+      await worker.initialize('eng')
+
+      const { data: { text } } = await worker.recognize(file, {
+        tessedit_pageseg_mode: '6',
+        tessedit_ocr_engine_mode: '1'
+      })
+
+      const extractedText = text.trim() || 'No text extracted from the image.'
+      console.log('✅ Text extracted:', extractedText.length, 'chars')
+      setOcrResultText(extractedText)
+
+      setOcrProgress('Generating PDF...')
+      setOcrPercent(70)
+      const pdfBlob = await createPdfBlobFromText(extractedText)
+
+      // Upload the PDF
+      const bucketName = 'dce-media'
+      const safeName = `ocr-${Date.now()}.pdf`
+      const filePath = `documents/${selectedBusiness?.id ?? 'unknown'}/${safeName}`
+
+      setOcrProgress('Uploading to storage...')
+      setOcrPercent(80)
+      const { data, error } = await supabase.storage.from(bucketName).upload(filePath, pdfBlob, {
+        contentType: 'application/pdf',
+        upsert: false
+      })
+
+      if (error) throw new Error(`Upload failed: ${error.message}`)
+      console.log('✅ PDF uploaded')
+
+      const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(filePath)
+
+      // Save to database
+      setOcrProgress('Saving to database...')
+      setOcrPercent(90)
+      const documentPayload = {
+        business_id: selectedBusiness?.id,
+        title: `OCR Document - ${file.name}`,
+        doc_type: 'OCR Document',
+        owner: 'System',
+        status: 'Draft',
+        confidentiality: 'Restricted',
+        description: extractedText,
+        file_url: publicUrlData.publicUrl,
+        file_type: 'pdf'
+      }
+
+      const { error: insertError } = await supabase.from('dce_documents').insert([documentPayload])
+
+      if (insertError) throw new Error(`Database insert failed: ${insertError.message}`)
+      console.log('✅ Document saved to DB')
+
+      // Refresh documents (non-blocking)
+      console.log('✅ Refreshing documents in background...')
+      if (selectedBusiness) {
+        loadDceData(selectedBusiness.id).catch((err) => console.error('Background refresh failed:', err))
+      }
+
+      const endTime = performance.now()
+      const totalTime = endTime - startTime
+      console.log('✅ OCR COMPLETED in', (totalTime / 1000).toFixed(1), 's')
+
+      setOcrProgress(`Completed (${Math.round(totalTime / 1000)}s)`)
+      setOcrPercent(100)
+      toast.success(`OCR document added in ${(totalTime / 1000).toFixed(1)}s.`)
+    } catch (error: any) {
+      console.error('❌ OCR add failed:', error)
+      setOcrProgress('Failed')
+      setOcrPercent(0)
+      setOcrResultText('')
+      toast.error('Failed to add OCR document: ' + (error?.message ?? JSON.stringify(error) ?? error))
+    } finally {
+      if (fallbackInterval !== null) {
+        window.clearInterval(fallbackInterval)
+        fallbackInterval = null
+      }
+      if (worker) {
+        try {
+          await worker.terminate()
+        } catch (cleanupError) {
+          console.warn('Failed to terminate OCR worker:', cleanupError)
+        }
+        worker = null
+      }
+      setTimeout(() => {
+        setOcrProcessing(false)
+        setOcrProgress('')
+        setOcrPercent(null)
+      }, 700)
+      setOcrFileInput(null)
+    }
+  }
+
+  async function processHandwrittenImage(file: File) {
+    const startTime = performance.now()
+    setOcrProcessing(true)
+    setOcrProgress('Initializing OCR...')
+    setOcrPercent(0)
+    setOcrResultText('')
+    console.log('Starting OCR processing...')
+    let fallbackInterval: number | null = null
+    let timeoutId: number | null = null
+    let worker: any = null
+
+    if (handwrittenPdfUrl) {
+      URL.revokeObjectURL(handwrittenPdfUrl)
+      setHandwrittenPdfUrl(null)
+    }
+
+    try {
+      fallbackInterval = window.setInterval(() => {
+        setOcrPercent((prev) => {
+          const next = (prev ?? 0) + Math.random() * 8 + 2
+          return Math.min(95, next)
+        })
+      }, 800)
+
+      timeoutId = window.setTimeout(() => {
+        console.warn('⏱️ OCR timeout - 30s exceeded')
+        if (fallbackInterval !== null) {
+          window.clearInterval(fallbackInterval)
+        }
+        setOcrProgress('Timeout - check console')
+        setOcrPercent(100)
+      }, 30000) // 30 seconds timeout
+
+      setOcrProgress('Creating Tesseract worker...')
+      worker = await createWorker({
+        logger: (m) => {
+          console.log('Tesseract:', m)
+          updateOcrStatus(m)
+        }
+      })
+
+      setOcrProgress('Loading worker...')
+      await worker.load()
+
+      setOcrProgress('Loading language data...')
+      await worker.loadLanguage('eng')
+
+      setOcrProgress('Initializing engine...')
+      await worker.initialize('eng')
+
+      setOcrProgress('Recognizing text...')
+      const { data: { text } } = await worker.recognize(file, {
+        tessedit_pageseg_mode: '6', // Uniform block of text
+        tessedit_ocr_engine_mode: '1' // Neural nets LSTM engine
+      })
+
+      const extractedText = text.trim() || 'No text extracted from the handwritten note.'
+      setOcrResultText(extractedText)
+      console.log('Extracted text length:', extractedText.length)
+
+      setOcrProgress('Generating PDF...')
+      const pdfBlob = await createPdfBlobFromText(extractedText)
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      setDocumentForm({ ...documentForm, description: extractedText, file_type: 'pdf' })
+      setPendingHandwrittenPdfBlob(pdfBlob)
+      setHandwrittenPdfUrl(pdfUrl)
+
+      const endTime = performance.now()
+      const totalTime = endTime - startTime
+      console.log(`Total OCR processing time: ${(totalTime / 1000).toFixed(2)} seconds`)
+
+      setOcrProgress(`Completed (${Math.round(totalTime / 1000)}s)`)
+      setOcrPercent(100)
+      toast.success(`OCR complete in ${(totalTime / 1000).toFixed(1)}s. Preview generated PDF before uploading.`)
+    } catch (error: any) {
+      const endTime = performance.now()
+      const totalTime = endTime - startTime
+      console.error('OCR failed after', totalTime.toFixed(2), 'ms:', error)
+      setOcrProgress('Failed')
+      setOcrPercent(0)
+      setOcrResultText('')
+      toast.error('Failed to extract text from image: ' + (error?.message ?? JSON.stringify(error) ?? error))
+    } finally {
+      if (fallbackInterval !== null) {
+        window.clearInterval(fallbackInterval)
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      if (worker) {
+        try {
+          await worker.terminate()
+        } catch (cleanupError) {
+          console.warn('Failed to terminate OCR worker:', cleanupError)
+        }
+        worker = null
+      }
+      setTimeout(() => {
+        setOcrProcessing(false)
+        setOcrProgress('')
+        setOcrPercent(null)
+      }, 700)
+    }
+  }
+
   async function uploadDocumentMedia(file: File) {
     const bucketName = 'dce-media'
     const safeName = file.name.replace(/\s+/g, '_')
@@ -399,7 +786,19 @@ export default function DceDashboard() {
       let fileUrl = documentForm.file_url
       let fileType = documentForm.file_type
 
-      if (mediaFile) {
+      if (documentForm.doc_type === 'Handwritten Note') {
+        if (pendingHandwrittenPdfBlob) {
+          const pdfFile = new File([pendingHandwrittenPdfBlob], `handwritten-note-${Date.now()}.pdf`, { type: 'application/pdf' })
+          const uploadResult = await uploadDocumentMedia(pdfFile)
+          fileUrl = uploadResult.publicUrl
+          fileType = 'pdf'
+        } else if (documentForm.file_url) {
+          fileUrl = documentForm.file_url
+          fileType = 'pdf'
+        } else {
+          throw new Error('Please upload a handwritten note image and preview the generated PDF before saving.')
+        }
+      } else if (mediaFile) {
         const uploadResult = await uploadDocumentMedia(mediaFile)
         fileUrl = uploadResult.publicUrl
         fileType = uploadResult.fileType
@@ -433,6 +832,12 @@ export default function DceDashboard() {
 
       setDocumentForm(initialDocumentForm)
       setMediaFile(null)
+      setHandwrittenImage(null)
+      setPendingHandwrittenPdfBlob(null)
+      if (handwrittenPdfUrl) {
+        URL.revokeObjectURL(handwrittenPdfUrl)
+        setHandwrittenPdfUrl(null)
+      }
       setEditingDocumentId(null)
       loadDceData(selectedBusiness.id)
     } catch (err: any) {
@@ -481,6 +886,7 @@ export default function DceDashboard() {
       file_type: document.file_type ?? 'image'
     })
     setMediaFile(null)
+    setHandwrittenImage(null)
   }
 
   async function saveMeeting() {
@@ -498,6 +904,7 @@ export default function DceDashboard() {
         meeting_time: meetingForm.meeting_time,
         platform: meetingForm.platform,
         attendees: meetingForm.attendees.split(',').map((item) => item.trim()).filter(Boolean),
+        notify_numbers: meetingForm.notify_numbers,
         link: meetingForm.link,
         notes: meetingForm.notes
       }
@@ -510,6 +917,40 @@ export default function DceDashboard() {
         if (error) throw error
         toast.success('Meeting added')
       }
+
+      const shouldSendEmail = meetingForm.notify_members && meetingForm.notify_numbers.trim()
+      if (shouldSendEmail) {
+        setSmsSending(true)
+        try {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+          const emailPayload = {
+            emails: meetingForm.notify_numbers,
+            title: meetingForm.title,
+            meeting_date: meetingForm.meeting_date,
+            meeting_time: meetingForm.meeting_time,
+            platform: meetingForm.platform,
+            link: meetingForm.link,
+            notes: meetingForm.notes
+          }
+          const emailResponse = await fetch(`${backendUrl}/send-meeting-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emailPayload)
+          })
+          const emailData = await emailResponse.json()
+          if (!emailResponse.ok || !emailData.ok) {
+            const details = emailData.error || emailData.details?.message || emailData.details || 'Email send failed'
+            throw new Error(String(details))
+          }
+          toast.success('Meeting email sent to notified members')
+        } catch (emailError: any) {
+          console.error('Send meeting email error', emailError)
+          toast.error('Meeting saved, but email failed: ' + (emailError?.message ?? emailError))
+        } finally {
+          setSmsSending(false)
+        }
+      }
+
       setMeetingForm(initialMeetingForm)
       setEditingMeetingId(null)
       loadDceData(selectedBusiness.id)
@@ -538,6 +979,8 @@ export default function DceDashboard() {
       meeting_time: meeting.meeting_time,
       platform: meeting.platform,
       attendees: meeting.attendees.join(', '),
+      notify_numbers: meeting.notify_numbers ?? '',
+      notify_members: false,
       link: meeting.link,
       notes: meeting.notes
     })
@@ -718,6 +1161,14 @@ export default function DceDashboard() {
   function resetDocumentForm() {
     setDocumentForm(initialDocumentForm)
     setEditingDocumentId(null)
+    setMediaFile(null)
+    setHandwrittenImage(null)
+    setPendingHandwrittenPdfBlob(null)
+    setOcrProgress('')
+    if (handwrittenPdfUrl) {
+      URL.revokeObjectURL(handwrittenPdfUrl)
+      setHandwrittenPdfUrl(null)
+    }
   }
 
   function resetMeetingForm() {
@@ -804,7 +1255,7 @@ export default function DceDashboard() {
   ]
 
   function renderInsideXTab() {
-    const feedPosts = documents.filter((doc) => doc.file_url)
+    const feedPosts = documents && documents.length > 0 ? documents.filter((doc) => doc.file_url) : []
     const selectedPost = feedPosts.find((post) => post.id === selectedPostId) ?? feedPosts[0]
 
     return (
@@ -820,7 +1271,7 @@ export default function DceDashboard() {
         <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:px-0">
           <div className="inline-grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-4">
             {feedPosts.length ? feedPosts.map((post) => (
-              <button key={post.id} type="button" onClick={() => setSelectedPostId(post.id)} className={`min-w-[220px] rounded-3xl border ${selectedPostId === post.id ? 'border-emerald-700 bg-emerald-50' : 'border-stone-200 bg-white'} overflow-hidden text-left shadow-sm hover:shadow-lg transition`}> 
+              <div key={post.id} role="button" tabIndex={0} onClick={() => setSelectedPostId(post.id)} onKeyDown={(event) => { if (event.key === 'Enter') setSelectedPostId(post.id) }} className={`min-w-[220px] rounded-3xl border ${selectedPostId === post.id ? 'border-emerald-700 bg-emerald-50' : 'border-stone-200 bg-white'} overflow-hidden text-left shadow-sm hover:shadow-lg transition cursor-pointer`}>
                 <div className="h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
                   {post.file_type === 'pdf' ? (
                     <div className="flex h-full items-center justify-center text-sm font-semibold text-stone-600">PDF</div>
@@ -832,7 +1283,21 @@ export default function DceDashboard() {
                   <div className="font-semibold text-slate-900 mb-2 truncate">{post.title}</div>
                   <div className="text-sm text-stone-600 line-clamp-3">{post.description || 'No description added yet.'}</div>
                 </div>
-              </button>
+                <div className="flex items-center justify-between gap-2 px-4 pb-4">
+                  <button type="button" onClick={(event) => { event.stopPropagation(); handleToggleLike(post.id) }} className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition ${likedPostIds.has(post.id) ? 'bg-rose-600 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
+                    <Heart className="w-4 h-4" />
+                    Like
+                  </button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); handleCommentAction(post.id) }} className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 transition">
+                    <MessageCircle className="w-4 h-4" />
+                    Comment
+                  </button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); handleSharePost(post) }} className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 transition">
+                    <Share2 className="w-4 h-4" />
+                    Share
+                  </button>
+                </div>
+              </div>
             )) : (
               <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-sm text-stone-500 min-w-[280px]">Add document items with media URLs to populate Inside X.</div>
             )}
@@ -859,8 +1324,11 @@ export default function DceDashboard() {
 
             <div className="rounded-3xl border border-stone-200 bg-white shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Comments</h3>
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <MessageCircle className="w-5 h-5 text-slate-700" />
+                    Comments
+                  </div>
                   <p className="text-sm text-stone-500">Add thoughts on this item.</p>
                 </div>
                 <span className="text-xs text-stone-500">{documentComments.filter((comment) => comment.document_id === selectedPost.id).length} comments</span>
@@ -878,7 +1346,7 @@ export default function DceDashboard() {
                 )}
               </div>
               <div className="space-y-3">
-                <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} rows={3} placeholder="Write a comment..." className="w-full rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"></textarea>
+                <textarea ref={commentInputRef} value={commentText} onChange={(event) => setCommentText(event.target.value)} rows={3} placeholder="Write a comment..." className="w-full rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"></textarea>
                 <button type="button" onClick={saveDocumentComment} className="w-full rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Post comment</button>
               </div>
             </div>
@@ -974,11 +1442,48 @@ export default function DceDashboard() {
   }
 
   function renderDocumentsTab() {
+    console.log('Rendering Documents tab, documents:', documents)
     return (
       <div className="space-y-10">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-medium text-slate-900">Documents Vault</h1>
-          <button type="button" onClick={resetDocumentForm} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 flex items-center gap-2"><Plus className="w-4 h-4" />{editingDocumentId ? 'Reset' : 'New'}</button>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => document.getElementById('ocr-file-input')?.click()} disabled={ocrProcessing} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              {ocrProcessing ? `Processing... ${ocrProgress}` : 'Add from OCR'}
+            </button>
+            <input
+              id="ocr-file-input"
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) {
+                  addFromOcr(file)
+                }
+                event.currentTarget.value = ''
+              }}
+              className="hidden"
+            />
+            <button type="button" onClick={resetDocumentForm} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 flex items-center gap-2"><Plus className="w-4 h-4" />{editingDocumentId ? 'Reset' : 'New'}</button>
+          </div>
+          {ocrProcessing && (
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 mt-3">
+              <div className="flex items-center justify-between text-sm text-slate-700 mb-2">
+                <span>{ocrProgress}</span>
+                {ocrPercent != null && <span>{ocrPercent}%</span>}
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${ocrPercent ?? 0}%` }} />
+              </div>
+            </div>
+          )}
+          {!ocrProcessing && ocrResultText && (
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 mt-3">
+              <div className="text-sm font-semibold text-slate-900">OCR result preview</div>
+              <div className="mt-2 text-sm text-slate-600 whitespace-pre-wrap max-h-40 overflow-y-auto">{ocrResultText}</div>
+            </div>
+          )}
         </div>
         <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-stone-200 grid gap-3">
@@ -987,12 +1492,25 @@ export default function DceDashboard() {
               <input value={documentForm.owner} onChange={(event) => setDocumentForm({ ...documentForm, owner: event.target.value })} placeholder="Owner" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <select value={documentForm.doc_type} onChange={(event) => setDocumentForm({ ...documentForm, doc_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+              <select value={documentForm.doc_type} onChange={(event) => {
+                const nextType = event.target.value
+                setDocumentForm({ ...documentForm, doc_type: nextType })
+                if (nextType !== 'Handwritten Note') {
+                  setPendingHandwrittenPdfBlob(null)
+                  setOcrProgress('')
+                  setOcrPercent(null)
+                  if (handwrittenPdfUrl) {
+                    URL.revokeObjectURL(handwrittenPdfUrl)
+                    setHandwrittenPdfUrl(null)
+                  }
+                }
+              }} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
                 <option>Contract</option>
                 <option>Resolution</option>
                 <option>Filing</option>
                 <option>NDA</option>
                 <option>Audit</option>
+                <option>Handwritten Note</option>
               </select>
               <select value={documentForm.status} onChange={(event) => setDocumentForm({ ...documentForm, status: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
                 {statusOptions.map((status) => <option key={status}>{status}</option>)}
@@ -1002,24 +1520,69 @@ export default function DceDashboard() {
               </select>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="text-slate-700 font-medium">Upload media</span>
-                <input type="file" accept="image/*,application/pdf" onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 file:rounded-full file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-white file:font-medium file:cursor-pointer" />
-                {(mediaFile || documentForm.file_url) && (
-                  <div className="text-xs text-stone-500">
-                    {mediaFile ? `Selected file: ${mediaFile.name}` : `Using existing media from previous upload`}
-                  </div>
-                )}
-                <div className="text-xs text-stone-400">Use Supabase storage for image/PDF upload. If no file is selected, the existing media remains unchanged.</div>
-              </label>
-              <select value={documentForm.file_type} onChange={(event) => setDocumentForm({ ...documentForm, file_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
-                <option value="image">Image</option>
-                <option value="pdf">PDF</option>
-              </select>
+              {documentForm.doc_type === 'Handwritten Note' ? (
+                <div className="space-y-3">
+                  <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-slate-700 font-medium">Upload handwritten image</span>
+                    <input type="file" accept="image/*" onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (file) {
+                        setHandwrittenImage(file)
+                        processHandwrittenImage(file)
+                      }
+                      event.currentTarget.value = ''
+                    }} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 file:rounded-full file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-white file:font-medium file:cursor-pointer" />
+                    {handwrittenImage && (
+                      <div className="text-xs text-stone-500">
+                        Selected: {handwrittenImage.name}
+                        {ocrProcessing && (
+                          <span className="ml-2 text-blue-600">
+                            {ocrProgress || 'Processing OCR...'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-xs text-stone-400">Upload an image of your handwritten notes. OCR will extract the text and generate a PDF for preview before uploading.</div>
+                  </label>
+                  {handwrittenPdfUrl && (
+                    <div className="rounded-2xl border border-stone-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-slate-800">OCR PDF preview ready</div>
+                          <div className="text-xs text-stone-500">Open the generated PDF to verify the OCR result before saving.</div>
+                        </div>
+                        <button type="button" onClick={() => window.open(handwrittenPdfUrl, '_blank')} className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">Open PDF</button>
+                      </div>
+                      <div className="mt-3">
+                        <iframe src={handwrittenPdfUrl} className="w-full h-[280px] rounded-xl border border-stone-200" title="Handwritten OCR Preview"></iframe>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label className="flex flex-col gap-2 text-sm">
+                  <span className="text-slate-700 font-medium">Upload media</span>
+                  <input type="file" accept="image/*,application/pdf" onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 file:rounded-full file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-white file:font-medium file:cursor-pointer" />
+                  {(mediaFile || documentForm.file_url) && (
+                    <div className="text-xs text-stone-500">
+                      {mediaFile ? `Selected file: ${mediaFile.name}` : `Using existing media from previous upload`}
+                    </div>
+                  )}
+                  <div className="text-xs text-stone-400">Use Supabase storage for image/PDF upload. If no file is selected, the existing media remains unchanged.</div>
+                </label>
+              )}
+              {documentForm.doc_type === 'Handwritten Note' ? (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-700">Output type: PDF</div>
+              ) : (
+                <select value={documentForm.file_type} onChange={(event) => setDocumentForm({ ...documentForm, file_type: event.target.value })} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900">
+                  <option value="image">Image</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              )}
             </div>
             <textarea value={documentForm.description} onChange={(event) => setDocumentForm({ ...documentForm, description: event.target.value })} rows={2} placeholder="Description for Inside X" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full"></textarea>
             <div className="flex gap-3">
-              <button type="button" onClick={saveDocument} disabled={uploadingDocument} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50">{uploadingDocument ? (editingDocumentId ? 'Updating...' : 'Adding...') : editingDocumentId ? 'Update document' : 'Add document'}</button>
+              <button type="button" onClick={saveDocument} disabled={uploadingDocument || ocrProcessing} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50">{uploadingDocument ? (editingDocumentId ? 'Updating...' : 'Adding...') : ocrProcessing ? 'Processing...' : editingDocumentId ? 'Update document' : 'Add document'}</button>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -1033,26 +1596,28 @@ export default function DceDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
-                {documents.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-stone-50/80 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-start gap-3">
-                        <FileText className="w-4 h-4 text-stone-400" />
-                        <div>
-                          <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title}</div>
-                          <div className="text-[10px] text-stone-500">{doc.business_name} • {formatDate(doc.updated_at)}</div>
+                {Array.isArray(documents) && documents.length > 0 ? documents.map((doc) => {
+                  if (!doc || typeof doc !== 'object') return null
+                  return (
+                    <tr key={doc.id || Math.random()} className="hover:bg-stone-50/80 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <FileText className="w-4 h-4 text-stone-400" />
+                          <div>
+                            <div className="font-medium text-slate-900 truncate max-w-[220px]">{doc.title || 'Untitled'}</div>
+                            <div className="text-[10px] text-stone-500">{doc.business_name || ''} • {doc.updated_at ? formatDate(doc.updated_at) : ''}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-stone-600">{doc.doc_type}</td>
-                    <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
-                    <td className="px-4 py-3 space-x-2">
-                      <button type="button" onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
-                      <button type="button" onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
-                    </td>
-                  </tr>
-                ))}
-                {!documents.length && (
+                      </td>
+                      <td className="px-4 py-3 text-stone-600">{doc.doc_type || 'Unknown'}</td>
+                      <td className="px-4 py-3"><StatusBadge status={doc.status || 'Draft'} /></td>
+                      <td className="px-4 py-3 space-x-2">
+                        <button type="button" onClick={() => editDocument(doc)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
+                        <button type="button" onClick={() => removeDocument(doc.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4 inline" /></button>
+                      </td>
+                    </tr>
+                  )
+                }) : (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-sm text-stone-500">No documents yet. Start by adding one above.</td>
                   </tr>
@@ -1085,9 +1650,14 @@ export default function DceDashboard() {
               <input value={meetingForm.meeting_time} onChange={(event) => setMeetingForm({ ...meetingForm, meeting_time: event.target.value })} placeholder="Time" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900" />
             </div>
             <input value={meetingForm.attendees} onChange={(event) => setMeetingForm({ ...meetingForm, attendees: event.target.value })} placeholder="Attendees (comma separated)" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <input value={meetingForm.notify_numbers} onChange={(event) => setMeetingForm({ ...meetingForm, notify_numbers: event.target.value })} placeholder="Notify emails (comma separated)" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
+            <label className="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={meetingForm.notify_members} onChange={(event) => setMeetingForm({ ...meetingForm, notify_members: event.target.checked })} className="h-4 w-4 rounded border-stone-300 text-slate-900 focus:ring-slate-900" />
+              Notify members by email when saving
+            </label>
             <input value={meetingForm.link} onChange={(event) => setMeetingForm({ ...meetingForm, link: event.target.value })} placeholder="Meeting link" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full" />
             <textarea value={meetingForm.notes} onChange={(event) => setMeetingForm({ ...meetingForm, notes: event.target.value })} rows={3} placeholder="Notes / agenda" className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 w-full"></textarea>
-            <button type="button" onClick={saveMeeting} className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">{editingMeetingId ? 'Update meeting' : 'Add meeting'}</button>
+            <button type="button" onClick={saveMeeting} disabled={smsSending} className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{smsSending ? 'Sending email...' : editingMeetingId ? 'Update meeting' : 'Add meeting'}</button>
           </div>
           <div className="p-5 space-y-4">
             {meetings.length ? meetings.map((meeting) => (
@@ -1103,6 +1673,7 @@ export default function DceDashboard() {
                   </div>
                 </div>
                 <div className="text-xs text-stone-600 mb-3">{meeting.platform} · {meeting.attendees.join(', ')}</div>
+                {meeting.notify_numbers ? <div className="text-xs text-stone-500 mb-2">Notified: {meeting.notify_numbers}</div> : null}
                 <div className="text-sm text-stone-700">{meeting.notes || 'No agenda notes added.'}</div>
                 {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-emerald-700 hover:text-emerald-800">Open link</a>}
               </div>
@@ -1162,6 +1733,17 @@ export default function DceDashboard() {
                 <Line type="monotone" dataKey="amount" stroke="#0f172a" strokeWidth={3} dot={false} />
               </LineChart>
             </div>
+            {ocrProcessing && (
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 mt-3">
+                <div className="flex items-center justify-between text-sm text-slate-700 mb-2">
+                  <span>{ocrProgress}</span>
+                  {ocrPercent != null && <span>{ocrPercent}%</span>}
+                </div>
+                <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${ocrPercent ?? 0}%` }} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
@@ -1241,7 +1823,8 @@ export default function DceDashboard() {
                     <td className="px-4 py-3">₹{Number(decision.amount).toLocaleString()}</td>
                     <td className="px-4 py-3">{decision.proposer}</td>
                     <td className="px-4 py-3"><RiskBadge risk={decision.risk} /></td>
-                    <td className="px-4 py-3 space-x-2">
+                    <td className="px-4 py-3 space-x-3">
+                      <button type="button" onClick={() => { setSelectedDecisionForNotif(decision); setNotificationModalOpen(true) }} className="text-sky-600 hover:text-sky-800 font-semibold text-xs">Notify</button>
                       <button type="button" onClick={() => editDecision(decision)} className="text-slate-600 hover:text-slate-900"><Pencil className="w-4 h-4 inline" /></button>
                       <button type="button" onClick={() => removeDecision(decision.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="w-4 h-4" /></button>
                     </td>
@@ -1484,10 +2067,12 @@ export default function DceDashboard() {
   }
 
   function renderActiveTab() {
+    console.log('Rendering active tab:', activeTab)
     switch (activeTab) {
       case 'Inside X':
         return renderInsideXTab()
       case 'Documents':
+        console.log('Rendering Documents tab')
         return renderDocumentsTab()
       case 'Meetings':
         return renderMeetingsTab()
@@ -1507,7 +2092,7 @@ export default function DceDashboard() {
     }
   }
 
-  if (isInitialLoading) {
+  if (showDceIntro) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center">
         <style>{`
@@ -1537,6 +2122,66 @@ export default function DceDashboard() {
     )
   }
 
+  if (!passcodeVerified) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center px-4 py-10">
+        <style>{`
+          @keyframes slideDown {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes slideIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div className="space-y-3 px-4">
+            <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-[0.35em] leading-tight animate-slideDown">This is a Highly Encrypted Area</h1>
+            <p className="text-sm uppercase text-slate-400 tracking-[0.35em] animate-slideIn">Enter passcode to sign in</p>
+          </div>
+
+          <div className="rounded-[2rem] border border-slate-800 bg-[#07080d]/95 p-6 shadow-[0_0_80px_rgba(0,0,0,0.45)]">
+            <div className="relative" onClick={() => document.getElementById('dce-passcode-input')?.focus()}>
+              <input
+                id="dce-passcode-input"
+                autoFocus
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                value={passcodeInput}
+                onChange={(event) => handlePasscodeInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    verifyPasscode()
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 text-transparent caret-white"
+              />
+              <div className="grid grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map((index) => (
+                  <div key={index} className="h-16 rounded-3xl border border-slate-700 bg-[#0c1221] flex items-center justify-center text-3xl font-semibold tracking-[0.25em] text-white shadow-inner shadow-black/25">
+                    {passcodeInput[index] || '•'}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {passcodeError ? <div className="mt-4 text-sm text-rose-400">{passcodeError}</div> : null}
+            <button
+              type="button"
+              onClick={() => verifyPasscode()}
+              className="mt-5 w-full rounded-full border border-slate-700 bg-[#111827] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_15px_35px_rgba(0,0,0,0.35)] transition hover:bg-[#161f2f]"
+            >
+              Unlock
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#FDFBF7]">
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-72 bg-[#0F172A] z-20">
@@ -1555,7 +2200,10 @@ export default function DceDashboard() {
               <button
                 key={item.label}
                 type="button"
-                onClick={() => setActiveTab(item.label)}
+                onClick={() => {
+                  console.log('Setting active tab to:', item.label)
+                  setActiveTab(item.label)
+                }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm border border-transparent transition-colors ${activeTab === item.label ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'}`}>
                 <item.icon className="w-4 h-4" />
                 {item.label}
@@ -1660,6 +2308,9 @@ export default function DceDashboard() {
             <div className="rounded-xl border border-stone-200 bg-white px-4 py-2 shadow-sm text-sm text-stone-600">{selectedBusiness ? selectedBusiness.type : 'Select a business'}</div>
           </div>
           <div className="flex items-center gap-3">
+            <button type="button" onClick={handleLogout} className="rounded-full border border-stone-200 bg-slate-950/80 text-sm font-semibold text-white px-3 py-2 hover:bg-slate-900 transition-colors">
+              Log out
+            </button>
             <div className="relative hidden md:block">
               <Bell className="w-5 h-5 text-stone-500 hover:text-stone-900 cursor-pointer" />
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-700 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#FDFBF7]">3</div>
@@ -1680,7 +2331,10 @@ export default function DceDashboard() {
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setActiveTab(item.label)}
+                  onClick={() => {
+                    console.log('Mobile: Setting active tab to:', item.label)
+                    setActiveTab(item.label)
+                  }}
                   className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap ${activeTab === item.label ? 'bg-slate-900 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                   {item.label}
                 </button>
@@ -1689,9 +2343,74 @@ export default function DceDashboard() {
           </div>
         </div>
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-10">
-          {renderActiveTab()}
+          {(() => {
+            try {
+              return renderActiveTab()
+            } catch (error) {
+              console.error('Error rendering active tab:', error)
+              return (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                  <div className="text-red-800 font-medium mb-2">Error loading tab content</div>
+                  <div className="text-red-600 text-sm">Please refresh the page or try selecting a different tab.</div>
+                  <div className="text-red-500 text-xs mt-2">Error: {error instanceof Error ? error.message : 'Unknown error'}</div>
+                </div>
+              )
+            }
+          })()}
         </div>
       </main>
+
+      {notificationModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-slate-900">Send Email Notification</h2>
+              <p className="text-sm text-stone-600">
+                Notify stakeholders about "{selectedDecisionForNotif?.title}"
+              </p>
+            </div>
+
+            <div className="bg-stone-50 rounded-xl p-4 text-sm">
+              <div className="font-semibold text-slate-900">{selectedDecisionForNotif?.title}</div>
+              <div className="text-stone-600">Amount: ₹{selectedDecisionForNotif ? Number(selectedDecisionForNotif.amount).toLocaleString() : 0}</div>
+              <div className="text-stone-600">Proposer: {selectedDecisionForNotif?.proposer}</div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-900">Email addresses (comma-separated)</label>
+              <textarea
+                value={notificationEmails}
+                onChange={(event) => setNotificationEmails(event.target.value)}
+                placeholder="email1@example.com, email2@example.com"
+                rows={3}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNotificationModalOpen(false)
+                  setSelectedDecisionForNotif(null)
+                  setNotificationEmails('')
+                }}
+                className="flex-1 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={sendDecisionNotification}
+                disabled={sendingNotification}
+                className="flex-1 rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {sendingNotification ? 'Sending...' : 'Send Notification'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
