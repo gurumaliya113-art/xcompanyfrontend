@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ArrowRight, Handshake, Search, Shield,
+  ArrowRight, Search, Shield,
   Briefcase, Truck, Factory, Recycle, ShoppingCart, Sparkles, Wrench,
   Star, FileText, Send
 } from 'lucide-react'
@@ -133,41 +133,47 @@ export default function HomePage() {
   return (
     <div className="space-y-12">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-        <div className="relative grid gap-10 md:grid-cols-2 md:items-center">
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
-              Premium Business Showcase
-            </p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">
-              Building modern, reliable solutions for growing businesses
-            </h1>
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              Explore our work, partner with us, or send your project requirements. We focus on clarity, quality, and on-time delivery.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link to="/partner" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                <Handshake className="h-4 w-4" /> Partner With Us <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/enquire" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">
-                <Search className="h-4 w-4 text-slate-700" /> Enquire For Work
-              </Link>
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-10 shadow-sm sm:px-10 sm:py-16">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[length:80px_80px]" />
+        <div className="pointer-events-none absolute left-[10%] top-[16%] h-28 w-28 rounded-3xl bg-orange-100/80 blur-3xl" />
+        <div className="pointer-events-none absolute right-[10%] top-[24%] h-24 w-24 rounded-3xl bg-sky-100/80 blur-3xl" />
+        <div className="relative mx-auto max-w-5xl text-center">
+          <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
+            Building High-Performance Websites and Software That Power Growing Businesses.
+          </h1>
+          <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
+            We design and develop custom websites, web applications, and software platforms that help businesses acquire users, streamline operations, and scale with confidence.
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open-enquire'))} className="inline-flex items-center justify-center rounded-full bg-orange-500 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600">
+              Request A Quote
+            </button>
+            <Link to="/partner" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">
+              Explore Solutions
+            </Link>
+          </div>
+          <div className="mt-12 flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="inline-flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">D</span>
+                <span className="text-sm font-semibold tracking-[0.16em] text-slate-700">DESIGNRUSH</span>
+              </div>
+              <div className="text-xs text-slate-500">4.8 Star Ratings</div>
             </div>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Showreel</h2>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-              <video className="h-64 w-full object-cover" autoPlay loop muted playsInline preload="metadata">
-                <source src="/media/videox.webm" type="video/webm" />
-                <source src="/media/videox.mp4" type="video/mp4" />
-              </video>
+            <div className="flex flex-col items-center gap-2">
+              <div className="inline-flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">C</span>
+                <span className="text-sm font-semibold tracking-[0.16em] text-slate-700">Clutch</span>
+              </div>
+              <div className="text-xs text-slate-500">4.9/5.0 ★★★★★</div>
             </div>
-            <h2 className="text-base font-semibold text-slate-900">What you can expect</h2>
-            <FeatureList items={['Clear scope and transparent timelines', 'Responsive communication and updates', 'Clean delivery with modern best practices']} />
-          </motion.div>
+          </div>
         </div>
       </section>
+
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open-enquire'))} className="fixed right-5 bottom-5 z-50 hidden rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/20 transition hover:bg-orange-600 md:inline-flex">
+        Book A Call
+      </button>
 
       {/* Services */}
       <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">

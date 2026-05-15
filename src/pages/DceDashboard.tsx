@@ -303,6 +303,9 @@ export default function DceDashboard() {
   const [ocrResultText, setOcrResultText] = useState<string>('')
   const [ocrProcessing, setOcrProcessing] = useState<boolean>(false)
   const [ocrFileInput, setOcrFileInput] = useState<File | null>(null)
+  const [meetingScores, setMeetingScores] = useState<Record<number, any>>({})
+  const [submittingMeetingScore, setSubmittingMeetingScore] = useState<Set<number>>(new Set())
+  const [expandedMeetingScores, setExpandedMeetingScores] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadBusinesses()
@@ -973,34 +976,43 @@ export default function DceDashboard() {
 
       const shouldSendEmail = meetingForm.notify_members && meetingForm.notify_numbers.trim()
       if (shouldSendEmail) {
-        setSmsSending(true)
-        try {
-          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-          const emailPayload = {
-            emails: meetingForm.notify_numbers,
-            title: meetingForm.title,
-            meeting_date: meetingForm.meeting_date,
-            meeting_time: meetingForm.meeting_time,
-            platform: meetingForm.platform,
-            link: meetingForm.link,
-            notes: meetingForm.notes
+        const emailList = String(meetingForm.notify_numbers)
+          .split(/[\s,;]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+
+        if (!emailList.length) {
+          toast.error('Please enter valid notify emails separated by commas or semicolons.')
+        } else {
+          setSmsSending(true)
+          try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3000' : window.location.origin)
+            const emailPayload = {
+              emails: emailList,
+              title: meetingForm.title,
+              meeting_date: meetingForm.meeting_date,
+              meeting_time: meetingForm.meeting_time,
+              platform: meetingForm.platform,
+              link: meetingForm.link,
+              notes: meetingForm.notes
+            }
+            const emailResponse = await fetch(`${backendUrl}/send-meeting-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(emailPayload)
+            })
+            const emailData = await emailResponse.json()
+            if (!emailResponse.ok || !emailData.ok) {
+              const details = emailData.error || emailData.details?.message || emailData.details || 'Email send failed'
+              throw new Error(String(details))
+            }
+            toast.success('Meeting email sent to notified members')
+          } catch (emailError: any) {
+            console.error('Send meeting email error', emailError)
+            toast.error('Meeting saved, but email failed: ' + (emailError?.message ?? emailError))
+          } finally {
+            setSmsSending(false)
           }
-          const emailResponse = await fetch(`${backendUrl}/send-meeting-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(emailPayload)
-          })
-          const emailData = await emailResponse.json()
-          if (!emailResponse.ok || !emailData.ok) {
-            const details = emailData.error || emailData.details?.message || emailData.details || 'Email send failed'
-            throw new Error(String(details))
-          }
-          toast.success('Meeting email sent to notified members')
-        } catch (emailError: any) {
-          console.error('Send meeting email error', emailError)
-          toast.error('Meeting saved, but email failed: ' + (emailError?.message ?? emailError))
-        } finally {
-          setSmsSending(false)
         }
       }
 
@@ -1037,6 +1049,74 @@ export default function DceDashboard() {
       link: meeting.link,
       notes: meeting.notes
     })
+  }
+
+  async function loadMeetingScores(meetingId: number) {
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3000' : window.location.origin)
+      const response = await fetch(`${backendUrl}/api/meeting-scores/${meetingId}`)
+      const data = await response.json()
+      
+      if (data.ok) {
+        setMeetingScores(prev => ({
+          ...prev,
+          [meetingId]: data
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to load meeting scores:', err)
+    }
+  }
+
+  async function submitMeetingScore(meetingId: number, score: string) {
+    try {
+      setSubmittingMeetingScore(prev => new Set([...prev, meetingId]))
+      
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3000' : window.location.origin)
+      const response = await fetch(`${backendUrl}/api/meeting-scores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meeting_id: meetingId,
+          score: score
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to submit score')
+      }
+      
+      toast.success('Score submitted anonymously ✓')
+      
+      // Reload scores to show updated stats
+      await loadMeetingScores(meetingId)
+    } catch (err: any) {
+      toast.error('Failed to submit score: ' + (err.message ?? err))
+    } finally {
+      setSubmittingMeetingScore(prev => {
+        const updated = new Set(prev)
+        updated.delete(meetingId)
+        return updated
+      })
+    }
+  }
+
+  function toggleMeetingScores(meetingId: number) {
+    if (expandedMeetingScores.has(meetingId)) {
+      setExpandedMeetingScores(prev => {
+        const updated = new Set(prev)
+        updated.delete(meetingId)
+        return updated
+      })
+    } else {
+      setExpandedMeetingScores(prev => new Set([...prev, meetingId]))
+      // Load scores when expanding
+      if (!meetingScores[meetingId]) {
+        loadMeetingScores(meetingId)
+      }
+    }
   }
 
   async function saveDecision() {
@@ -1859,8 +1939,108 @@ export default function DceDashboard() {
                 </div>
                 <div className="text-xs text-stone-600 mb-3">{meeting.platform} · {meeting.attendees.join(', ')}</div>
                 {meeting.notify_numbers ? <div className="text-xs text-stone-500 mb-2">Notified: {meeting.notify_numbers}</div> : null}
-                <div className="text-sm text-stone-700">{meeting.notes || 'No agenda notes added.'}</div>
-                {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-emerald-700 hover:text-emerald-800">Open link</a>}
+                <div className="text-sm text-stone-700 mb-3">{meeting.notes || 'No agenda notes added.'}</div>
+                <div className="space-y-3">
+                  {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="inline-block text-sm text-emerald-700 hover:text-emerald-800">Open link</a>}
+                  
+                  {/* Meeting Score Section */}
+                  <div className="pt-3 border-t border-stone-200">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-stone-600">Meeting Score</span>
+                      <button 
+                        type="button"
+                        onClick={() => toggleMeetingScores(meeting.id)}
+                        className="text-xs text-slate-600 hover:text-slate-900 underline"
+                      >
+                        {expandedMeetingScores.has(meeting.id) ? 'Hide scores' : 'View scores'}
+                      </button>
+                    </div>
+                    
+                    {/* Score Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => submitMeetingScore(meeting.id, 'poor')}
+                        disabled={submittingMeetingScore.has(meeting.id)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 disabled:opacity-50 transition"
+                      >
+                        Poor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitMeetingScore(meeting.id, 'bad')}
+                        disabled={submittingMeetingScore.has(meeting.id)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50 transition"
+                      >
+                        Bad
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitMeetingScore(meeting.id, 'good')}
+                        disabled={submittingMeetingScore.has(meeting.id)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 transition"
+                      >
+                        Good
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitMeetingScore(meeting.id, 'excellent')}
+                        disabled={submittingMeetingScore.has(meeting.id)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition"
+                      >
+                        Excellent
+                      </button>
+                    </div>
+                    
+                    {/* Score Statistics - Shown when expanded */}
+                    {expandedMeetingScores.has(meeting.id) && meetingScores[meeting.id] && (
+                      <div className="mt-3 pt-3 border-t border-stone-200 space-y-2">
+                        <div className="text-xs text-stone-600 font-medium">Response: {meetingScores[meeting.id].total_responses} participant{meetingScores[meeting.id].total_responses !== 1 ? 's' : ''}</div>
+                        {meetingScores[meeting.id].total_responses > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-600">Excellent</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-16 bg-stone-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{width: `${meetingScores[meeting.id].percentages.excellent}%`}}></div>
+                                </div>
+                                <span className="font-medium text-stone-700 w-8 text-right">{meetingScores[meeting.id].percentages.excellent}%</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-600">Good</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-16 bg-stone-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500" style={{width: `${meetingScores[meeting.id].percentages.good}%`}}></div>
+                                </div>
+                                <span className="font-medium text-stone-700 w-8 text-right">{meetingScores[meeting.id].percentages.good}%</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-600">Bad</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-16 bg-stone-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-500" style={{width: `${meetingScores[meeting.id].percentages.bad}%`}}></div>
+                                </div>
+                                <span className="font-medium text-stone-700 w-8 text-right">{meetingScores[meeting.id].percentages.bad}%</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-600">Poor</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-16 bg-stone-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-rose-500" style={{width: `${meetingScores[meeting.id].percentages.poor}%`}}></div>
+                                </div>
+                                <span className="font-medium text-stone-700 w-8 text-right">{meetingScores[meeting.id].percentages.poor}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="text-xs text-stone-500 italic mt-2">Scores are completely anonymous • No personal data stored</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )) : <div className="text-center text-sm text-stone-500">No meetings scheduled yet.</div>}
           </div>
