@@ -7,6 +7,11 @@ import HeeraModal from './components/HeeraModal'
 import HomePage from './pages/HomePage'
 import NewHomePage from './pages/NewHomePage'
 import PortfolioPage from './pages/PortfolioPage'
+import SolutionsPage from './pages/SolutionsPage'
+import IndustriesPage from './pages/IndustriesPage'
+import AboutPage from './pages/AboutPage'
+import BlogsPage from './pages/BlogsPage'
+import ContactPage from './pages/ContactPage'
 import PartnerPage from './pages/PartnerPage'
 import PartnerBenefitsPage from './pages/PartnerBenefitsPage'
 import EnquirePage from './pages/EnquirePage'
@@ -40,6 +45,11 @@ export default function App() {
         {/* New public site (own navbar/footer, no Layout wrapper) */}
         <Route path="/" element={<NewHomePage />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
+        <Route path="/solutions" element={<SolutionsPage />} />
+        <Route path="/industries" element={<IndustriesPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/blogs" element={<BlogsPage />} />
+        <Route path="/contact" element={<ContactPage />} />
 
         {/* DCE (own chrome) */}
         <Route path="/dce" element={<DcePage />} />

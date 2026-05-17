@@ -45,13 +45,13 @@ export default function Home() {
             <span className="text-xl font-bold text-primary">excompany</span>
           </Link>
           
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-7">
             <Link to="/portfolio" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Our Work</Link>
-            <Link to="/partner" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Solutions</Link>
-            <Link to="/partner-benefits" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Industries</Link>
-            <Link to="/work-benefits" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">About</Link>
-            <Link to="/enquire" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Blogs</Link>
-            <Link to="/enquire" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Contact</Link>
+            <Link to="/solutions" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Solutions</Link>
+            <Link to="/industries" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Industries</Link>
+            <Link to="/about" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">About</Link>
+            <Link to="/blogs" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Blogs</Link>
+            <Link to="/contact" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Contact</Link>
             <Link to="/admin-login" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Admin</Link>
           </nav>
 
@@ -82,11 +82,11 @@ export default function Home() {
             >
               <nav className="flex flex-col">
                 <Link to="/portfolio" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Our Work</Link>
-                <Link to="/partner" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Solutions</Link>
-                <Link to="/partner-benefits" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Industries</Link>
-                <Link to="/work-benefits" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">About</Link>
-                <Link to="/enquire" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Blogs</Link>
-                <Link to="/enquire" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Contact</Link>
+                <Link to="/solutions" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Solutions</Link>
+                <Link to="/industries" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Industries</Link>
+                <Link to="/about" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">About</Link>
+                <Link to="/blogs" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Blogs</Link>
+                <Link to="/contact" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Contact</Link>
                 <Link to="/admin-login" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Admin</Link>
                 <Button
                   onClick={() => { setMobileOpen(false); openEnquire(); }}
