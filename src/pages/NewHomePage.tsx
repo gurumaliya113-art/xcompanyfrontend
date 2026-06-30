@@ -53,6 +53,7 @@ export default function Home() {
             <Link to="/blogs" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Blogs</Link>
             <Link to="/contact" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Contact</Link>
             <Link to="/admin-login" className="text-sm font-medium text-gray-700 hover:text-primary transition-colors">Admin</Link>
+            <Link to="/dce/dashboard" className="text-sm font-semibold text-primary hover:opacity-80 transition-opacity">DCE</Link>
           </nav>
 
           <Button onClick={openEnquire} className="hidden md:inline-flex bg-primary hover:bg-primary/90 text-white rounded-full px-6 font-bold">
@@ -88,6 +89,7 @@ export default function Home() {
                 <Link to="/blogs" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Blogs</Link>
                 <Link to="/contact" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Contact</Link>
                 <Link to="/admin-login" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 hover:text-primary transition-colors">Admin</Link>
+                <Link to="/dce/dashboard" onClick={() => setMobileOpen(false)} className="rounded-xl px-3 py-3 text-base font-semibold text-primary hover:bg-gray-50 transition-colors">DCE</Link>
                 <Button
                   onClick={() => { setMobileOpen(false); openEnquire(); }}
                   className="mt-3 bg-primary hover:bg-primary/90 text-white rounded-full py-5 font-bold"

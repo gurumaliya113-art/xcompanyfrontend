@@ -20,6 +20,7 @@ import AdminLoginPage from './pages/AdminLoginPage'
 import AdminPage from './pages/AdminPage'
 import DcePage from './pages/DcePage'
 import DceDashboard from './pages/DceDashboard'
+import DceSimple from './pages/DceSimple'
 
 function Layout() {
   return (
@@ -53,7 +54,10 @@ export default function App() {
 
         {/* DCE (own chrome) */}
         <Route path="/dce" element={<DcePage />} />
-        <Route path="/dce/dashboard" element={<DceDashboard />} />
+        {/* Simple, mobile-first WhatsApp-style app is now the default dashboard */}
+        <Route path="/dce/dashboard" element={<DceSimple />} />
+        {/* Full feature-rich dashboard kept available here */}
+        <Route path="/dce/dashboard-full" element={<DceDashboard />} />
 
         {/* Legacy pages under shared Layout — admin login keeps everything after it working as-is */}
         <Route element={<Layout />}>
