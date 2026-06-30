@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import {
@@ -16,6 +16,8 @@ import {
   Video,
   Flame,
   ScanFace,
+  Sparkles,
+  Send,
   ExternalLink
 } from 'lucide-react'
 
@@ -41,7 +43,7 @@ type FileDoc = { id: number; title: string; doc_type: string; file_url?: string;
 type Spend = { id: number; vendor: string; category: string; amount: number; spend_date: string; status: string; note?: string }
 type Meeting = { id: number; title: string; meeting_date: string; meeting_time: string; platform: string; link?: string; notes?: string }
 
-type Tab = 'notes' | 'money' | 'files' | 'meetings'
+type Tab = 'notes' | 'money' | 'files' | 'meetings' | 'xai'
 type NoteForm = { title: string; content: string; todos: Todo[]; highlightColor: Note['highlightColor'] }
 type SpendForm = { vendor: string; amount: string; category: string; spend_date: string; note: string }
 type MeetingForm = { title: string; meeting_date: string; meeting_time: string; platform: string; link: string; notes: string }
@@ -558,7 +560,7 @@ export default function DceSimple() {
   const filteredMeetings = meetings.filter((m) => !q || m.title.toLowerCase().includes(q))
   const totalSpend = spends.reduce((sum, s) => sum + Number(s.amount || 0), 0)
 
-  const searchPlaceholder = { notes: 'Search notes', money: 'Search spends', files: 'Search files', meetings: 'Search meetings' }[tab]
+  const searchPlaceholder = { notes: 'Search notes', money: 'Search spends', files: 'Search files', meetings: 'Search meetings', xai: '' }[tab]
 
   return (
     <div className="min-h-screen mx-auto max-w-md flex flex-col relative" style={{ background: T.bg, fontFamily: FONT, color: T.text, WebkitFontSmoothing: 'antialiased' }}>
@@ -601,6 +603,7 @@ export default function DceSimple() {
           </div>
         )}
 
+        {tab !== 'xai' && (
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 rounded-full px-3 py-2" style={{ background: T.input }}>
             <Search className="w-4 h-4 text-white/70" />
@@ -617,6 +620,7 @@ export default function DceSimple() {
             )}
           </div>
         </div>
+        )}
       </header>
 
       {/* Content */}
@@ -627,17 +631,20 @@ export default function DceSimple() {
         {!loading && tab === 'money' && <MoneyList spends={filteredSpends} total={totalSpend} businessName={business?.name ?? ''} onDelete={deleteSpend} />}
         {!loading && tab === 'files' && <FilesList files={filteredFiles} onDelete={deleteFile} />}
         {!loading && tab === 'meetings' && <MeetingsList meetings={filteredMeetings} onDelete={deleteMeeting} />}
+        {tab === 'xai' && <AiChat business={business} />}
       </main>
 
-      {/* FAB */}
-      <button
-        onClick={onFabClick}
-        className="fixed bottom-24 z-30 w-14 h-14 rounded-2xl text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
-        style={{ background: T.accent, right: 'max(1rem, calc(50% - 14rem))' }}
-        aria-label="Add"
-      >
-        <Plus className="w-7 h-7" />
-      </button>
+      {/* FAB (hidden on X-Ai) */}
+      {tab !== 'xai' && (
+        <button
+          onClick={onFabClick}
+          className="fixed bottom-24 z-30 w-14 h-14 rounded-2xl text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          style={{ background: T.accent, right: 'max(1rem, calc(50% - 14rem))' }}
+          aria-label="Add"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      )}
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-20 flex" style={{ background: T.nav, borderTop: `1px solid ${T.cardBorder}` }}>
@@ -645,6 +652,7 @@ export default function DceSimple() {
         <TabButton active={tab === 'money'} onClick={() => setTab('money')} icon={<Wallet className="w-5 h-5" />} label="Money" />
         <TabButton active={tab === 'files'} onClick={() => setTab('files')} icon={<Paperclip className="w-5 h-5" />} label="Files" />
         <TabButton active={tab === 'meetings'} onClick={() => setTab('meetings')} icon={<CalendarDays className="w-5 h-5" />} label="Meetings" />
+        <TabButton active={tab === 'xai'} onClick={() => setTab('xai')} icon={<Sparkles className="w-5 h-5" />} label="X-Ai" />
       </nav>
 
       {noteEditorOpen && (
@@ -851,6 +859,103 @@ function MeetingsList({ meetings, onDelete }: { meetings: Meeting[]; onDelete: (
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function AiChat({ business }: { business: Business | null }) {
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const endRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  async function send() {
+    const q = input.trim()
+    if (!q || !business || loading) return
+    setMessages((m) => [...m, { role: 'user', text: q }])
+    setInput('')
+    setLoading(true)
+    try {
+      const backendUrl =
+        (import.meta as any).env?.VITE_BACKEND_URL ||
+        (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:3000' : location.origin)
+      const resp = await fetch(`${backendUrl}/dce-ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: business.id, business_name: business.name, question: q })
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok || !data.ok) throw new Error(data.error || 'Request failed')
+      setMessages((m) => [...m, { role: 'ai', text: data.answer }])
+    } catch (err: any) {
+      setMessages((m) => [...m, { role: 'ai', text: '⚠️ ' + (err.message ?? err) }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const suggestions = ['Is mahine kitna kharcha hua?', 'Sabse zyada paisa kis pe gaya?', 'Pending kaam kaun se hain?']
+
+  return (
+    <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+      {messages.length === 0 && (
+        <div className="text-center mt-8 px-4">
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: T.accent }}>
+            <Sparkles className="w-7 h-7 text-white" />
+          </div>
+          <h3 className="font-bold" style={{ color: T.text }}>X-Ai</h3>
+          <p className="text-sm mt-1 mb-5" style={{ color: T.sub }}>
+            Ask anything about <b>{business?.name ?? 'this business'}</b> — spends, notes, tasks, meetings.
+          </p>
+          <div className="space-y-2">
+            {suggestions.map((s) => (
+              <button key={s} onClick={() => setInput(s)} className="block w-full text-left text-sm rounded-xl px-4 py-2.5" style={{ background: T.card, border: `1px solid ${T.cardBorder}`, color: T.text }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 space-y-3 pb-28">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className="max-w-[82%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap shadow-sm"
+              style={m.role === 'user' ? { background: T.accent, color: '#fff', borderBottomRightRadius: 4 } : { background: T.card, color: T.text, border: `1px solid ${T.cardBorder}`, borderBottomLeftRadius: 4 }}
+            >
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl px-4 py-2.5 text-sm" style={{ background: T.card, color: T.sub, border: `1px solid ${T.cardBorder}` }}>X-Ai is thinking…</div>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {/* Input bar fixed above bottom nav */}
+      <div className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-30 px-3 pb-2" style={{ bottom: 56 }}>
+        <div className="flex items-center gap-2 rounded-full px-2 py-1.5 shadow-lg" style={{ background: T.card, border: `1px solid ${T.cardBorder}` }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); send() } }}
+            placeholder="Ask X-Ai…"
+            className="flex-1 bg-transparent outline-none text-sm px-3"
+            style={{ color: T.text }}
+          />
+          <button onClick={send} disabled={!input.trim() || loading} className="w-9 h-9 rounded-full flex items-center justify-center text-white disabled:opacity-40" style={{ background: T.accent }}>
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
