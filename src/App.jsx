@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { Toaster } from 'react-hot-toast'
 import Navbar from './components/Navbar'
 import EnquireModal from './components/EnquireModal'
-import HeeraModal from './components/HeeraModal'
 import HomePage from './pages/HomePage'
 import NewHomePage from './pages/NewHomePage'
 import PortfolioPage from './pages/PortfolioPage'
@@ -41,7 +40,6 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{ style: { borderRadius: '1rem', fontSize: '14px' } }} />
       <EnquireModal />
-      <HeeraModal />
       <Routes>
         {/* New public site (own navbar/footer, no Layout wrapper) */}
         <Route path="/" element={<NewHomePage />} />
