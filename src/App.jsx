@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import EnquireModal from './components/EnquireModal'
 import HomePage from './pages/HomePage'
 import NewHomePage from './pages/NewHomePage'
+import ExflowHome from './pages/ExflowHome'
 import PortfolioPage from './pages/PortfolioPage'
 import SolutionsPage from './pages/SolutionsPage'
 import IndustriesPage from './pages/IndustriesPage'
@@ -42,7 +43,8 @@ export default function App() {
       <EnquireModal />
       <Routes>
         {/* New public site (own navbar/footer, no Layout wrapper) */}
-        <Route path="/" element={<NewHomePage />} />
+        <Route path="/" element={<ExflowHome />} />
+        <Route path="/home-new" element={<NewHomePage />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/solutions" element={<SolutionsPage />} />
         <Route path="/industries" element={<IndustriesPage />} />
