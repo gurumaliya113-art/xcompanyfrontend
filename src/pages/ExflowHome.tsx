@@ -915,9 +915,6 @@ export default function ExflowHome() {
         <Marquee />
         <VenturesSection />
         <WhyUsSection />
-        <ModelSection />
-        <TestimonialsSection />
-        <InTheFieldSection />
         <ConnectSection />
       </main>
       <Footer />
