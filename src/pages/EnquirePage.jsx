@@ -1,100 +1,202 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Send, ArrowRight } from 'lucide-react'
+import { Send } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import {
+  ArrowRight,
+  Field,
+  FormCard,
+  FormSuccess,
+  PageHero,
+  PrimaryButton,
+  Section,
+} from '../components/site/sections'
+
+/* Project enquiry.
+
+   Two things were wrong beyond styling:
+
+   1. Validation was `if (!form.name || !form.phone || !form.project_details)`
+      followed by a single toast naming all three fields. You were told
+      something was missing but not which one, and the message vanished after a
+      few seconds. Errors now sit under the field they belong to.
+
+   2. Budget and timeline were free-text inputs with example placeholders, so
+      the data arrived in a different shape from every submitter. They are now
+      the same option lists the contact page uses, which makes the enquiry list
+      filterable.
+*/
+
+const BUDGETS = ['Under ₹50,000', '₹50,000 – ₹2 lakh', '₹2 – 5 lakh', '₹5 lakh+', 'Not sure yet']
+const TIMELINES = ['As soon as possible', 'Within a month', '1–3 months', 'Just exploring']
+
+const EMPTY = { name: '', company: '', phone: '', email: '', project_details: '', budget: '', timeline: '' }
 
 export default function EnquirePage() {
+  const [form, setForm] = useState(EMPTY)
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    name: '', company: '', phone: '', email: '', project_details: '', budget: '', timeline: ''
-  })
+  const [sent, setSent] = useState(false)
 
-  function handleChange(e) {
+  function update(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  function validate() {
+    const next = {}
+    if (!form.name.trim()) next.name = 'Please tell us your name'
+    if (!form.phone.trim()) next.phone = 'A phone number lets us call you back'
+    else if (form.phone.replace(/\D/g, '').length < 10) next.phone = 'Enter a valid phone number'
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = 'Check this email address'
+    if (!form.project_details.trim()) next.project_details = 'Tell us briefly what you need built'
+    return next
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name || !form.phone || !form.project_details) {
-      toast.error('Name, phone and project details are required')
-      return
-    }
+    if (loading) return
+    const next = validate()
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
+
     setLoading(true)
     try {
-      const { error } = await supabase.from('enquiries').insert([{
-        name: form.name,
-        company: form.company,
-        phone: form.phone,
-        email: form.email,
-        project_details: form.project_details,
-        budget: form.budget,
-        timeline: form.timeline,
-      }])
-      if (error) throw error
-      toast.success('Enquiry submitted successfully!')
-      setForm({ name: '', company: '', phone: '', email: '', project_details: '', budget: '', timeline: '' })
+      if (!supabase) throw new Error('Cannot reach the server right now.')
+      const { error } = await supabase.from('enquiries').insert([
+        {
+          name: form.name.trim(),
+          company: form.company.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim(),
+          project_details: form.project_details.trim(),
+          budget: form.budget,
+          timeline: form.timeline,
+        },
+      ])
+      if (error) throw new Error(error.message)
+      setSent(true)
+      setForm(EMPTY)
+      toast.success('Enquiry submitted. We reply within 24 hours.')
     } catch (err) {
-      toast.error('Failed to submit. Please try again.')
+      toast.error(err.message || 'Could not submit. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="space-y-12">
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
-            <Send className="h-4 w-4" /> Enquire For Work
-          </p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-            Tell Us About Your Project
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Share your requirements and we'll get back to you with a plan, timeline, and transparent pricing.
-          </p>
-        </motion.div>
-      </section>
+    <>
+      <PageHero
+        label="Enquire For Work"
+        icon={Send}
+        title="Tell us about"
+        highlight="your project."
+        description="Share your requirements and we will come back with a plan, a timeline and transparent pricing."
+      />
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-        <h2 className="text-xl font-semibold text-slate-900">Project Enquiry Form</h2>
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Full Name *</label>
-            <input name="name" value={form.name} onChange={handleChange} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Your full name" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Company</label>
-            <input name="company" value={form.company} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Company name" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Phone *</label>
-            <input name="phone" value={form.phone} onChange={handleChange} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Phone number" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Email</label>
-            <input name="email" type="email" value={form.email} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Email address" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Budget Range</label>
-            <input name="budget" value={form.budget} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="e.g. ₹50,000 - ₹2,00,000" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Timeline</label>
-            <input name="timeline" value={form.timeline} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="e.g. 2 weeks, 1 month" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700">Project Details *</label>
-            <textarea name="project_details" value={form.project_details} onChange={handleChange} required rows={5} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Describe your project, goals, and requirements..." />
-          </div>
-          <div className="md:col-span-2">
-            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50">
-              {loading ? 'Submitting...' : 'Submit Enquiry'} <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+      <Section>
+        <div className="mx-auto max-w-3xl">
+          {sent ? (
+            <FormSuccess
+              title="Enquiry received"
+              description="Thanks — we have it. Expect a reply within 24 hours on the number you gave us."
+              onReset={() => setSent(false)}
+              resetLabel="Submit another enquiry"
+            />
+          ) : (
+            <FormCard
+              title="Project enquiry"
+              description="Only name, phone and a short description are required."
+              onSubmit={handleSubmit}
+              footer={
+                <>
+                  <PrimaryButton type="submit" disabled={loading} className="w-full sm:w-auto">
+                    {loading ? 'Submitting…' : 'Submit enquiry'}
+                    {!loading && <ArrowRight className="h-4 w-4" />}
+                  </PrimaryButton>
+                  <p className="mt-3 text-sm text-gray-500">We reply within 24 hours. No spam, ever.</p>
+                </>
+              }
+            >
+              <Field
+                id="eq-name"
+                name="name"
+                label="Full name"
+                required
+                value={form.name}
+                onChange={update}
+                error={errors.name}
+                autoComplete="name"
+                placeholder="Your full name"
+              />
+              <Field
+                id="eq-company"
+                name="company"
+                label="Company"
+                value={form.company}
+                onChange={update}
+                autoComplete="organization"
+                placeholder="Optional"
+              />
+              <Field
+                id="eq-phone"
+                name="phone"
+                label="Phone"
+                required
+                type="tel"
+                value={form.phone}
+                onChange={update}
+                error={errors.phone}
+                autoComplete="tel"
+                placeholder="+91 "
+              />
+              <Field
+                id="eq-email"
+                name="email"
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={update}
+                error={errors.email}
+                autoComplete="email"
+                placeholder="you@company.com"
+              />
+              <Field
+                id="eq-budget"
+                name="budget"
+                label="Budget"
+                as="select"
+                options={BUDGETS}
+                value={form.budget}
+                onChange={update}
+                placeholder="Select a range"
+              />
+              <Field
+                id="eq-timeline"
+                name="timeline"
+                label="Timeline"
+                as="select"
+                options={TIMELINES}
+                value={form.timeline}
+                onChange={update}
+                placeholder="Select a timeline"
+              />
+              <Field
+                id="eq-details"
+                name="project_details"
+                label="What do you need built?"
+                required
+                as="textarea"
+                full
+                value={form.project_details}
+                onChange={update}
+                error={errors.project_details}
+                placeholder="A short description is enough — we will follow up with questions."
+              />
+            </FormCard>
+          )}
+        </div>
+      </Section>
+    </>
   )
 }

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Phone, Mail, MapPin, Send, ArrowRight } from 'lucide-react'
-import { GiOwl } from 'react-icons/gi'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import OwlLogo from './site/OwlLogo'
 
 const EMPTY = {
   name: '', company: '', phone: '', email: '',
@@ -100,8 +100,10 @@ export default function EnquireModal() {
                 <div className="absolute -bottom-20 -left-10 h-72 w-72 rounded-full bg-orange-500/10 blur-3xl" />
 
                 <div className="relative">
-                  <div className="flex items-center gap-2 mb-8">
-                    <GiOwl className="h-8 w-8 text-white" />
+                  <div className="flex items-center gap-2.5 mb-8">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#F97316]">
+                      <OwlLogo size={26} />
+                    </span>
                     <span className="text-2xl font-bold text-orange-500">excompany</span>
                   </div>
 
@@ -131,8 +133,8 @@ export default function EnquireModal() {
                       </span>
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Email</div>
-                        <a href="mailto:business.gurutron@gmail.com" className="block text-lg font-semibold text-white hover:text-orange-400 transition-colors break-all">
-                          business.gurutron@gmail.com
+                        <a href="mailto:azadgupta1010@gmail.com" className="block text-lg font-semibold text-white hover:text-orange-400 transition-colors break-all">
+                          azadgupta1010@gmail.com
                         </a>
                       </div>
                     </div>

@@ -1,100 +1,184 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Handshake, ArrowRight, Shield, Star, CheckCircle } from 'lucide-react'
+import { Handshake } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import {
+  ArrowRight,
+  Field,
+  FormCard,
+  FormSuccess,
+  PageHero,
+  PrimaryButton,
+  SecondaryButton,
+  Section,
+} from '../components/site/sections'
+
+/* Partnership interest.
+
+   Same rewrite as the enquiry page: shared primitives, per-field errors instead
+   of one disappearing toast, and an option list for investment interest so the
+   submissions are comparable rather than seven variations of "50k-1lakh".
+*/
+
+const INTEREST = [
+  'Referral partner (no investment)',
+  'Under ₹1 lakh',
+  '₹1 – 5 lakh',
+  '₹5 – 25 lakh',
+  '₹25 lakh+',
+  'Want to discuss first',
+]
+
+const EMPTY = { name: '', company: '', phone: '', email: '', investment_interest: '', message: '' }
 
 export default function PartnerPage() {
-  const navigate = useNavigate()
+  const [form, setForm] = useState(EMPTY)
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    name: '', company: '', phone: '', email: '', investment_interest: '', message: ''
-  })
+  const [sent, setSent] = useState(false)
 
-  function handleChange(e) {
+  function update(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name || !form.phone) {
-      toast.error('Name and phone are required')
-      return
-    }
+    if (loading) return
+
+    const next = {}
+    if (!form.name.trim()) next.name = 'Please tell us your name'
+    if (!form.phone.trim()) next.phone = 'A phone number lets us call you back'
+    else if (form.phone.replace(/\D/g, '').length < 10) next.phone = 'Enter a valid phone number'
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = 'Check this email address'
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
+
     setLoading(true)
     try {
-      const { error } = await supabase.from('partners').insert([{
-        name: form.name,
-        company: form.company,
-        phone: form.phone,
-        email: form.email,
-        investment_interest: form.investment_interest,
-        message: form.message,
-      }])
-      if (error) throw error
-      toast.success('Partnership request submitted!')
-      setForm({ name: '', company: '', phone: '', email: '', investment_interest: '', message: '' })
+      if (!supabase) throw new Error('Cannot reach the server right now.')
+      const { error } = await supabase.from('partners').insert([
+        {
+          name: form.name.trim(),
+          company: form.company.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim(),
+          investment_interest: form.investment_interest,
+          message: form.message.trim(),
+        },
+      ])
+      if (error) throw new Error(error.message)
+      setSent(true)
+      setForm(EMPTY)
+      toast.success('Partnership request submitted.')
     } catch (err) {
-      toast.error('Failed to submit. Please try again.')
+      toast.error(err.message || 'Could not submit. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="space-y-12">
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
-            <Handshake className="h-4 w-4" /> Partnership Program
-          </p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-            Partner With The X Company
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Join our network of strategic partners. We offer transparent, outcome-driven partnerships with shared growth.
-          </p>
-          <Link to="/partner-benefits" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700">
-            View Partner Benefits <ArrowRight className="h-4 w-4" />
-          </Link>
-        </motion.div>
-      </section>
+    <>
+      <PageHero
+        label="Partnership Programme"
+        icon={Handshake}
+        title="Partner with"
+        highlight="excompany."
+        description="Join our network of referral partners, collaborators and investors. Transparent terms, outcome-driven, shared growth."
+      >
+        <SecondaryButton to="/partner-benefits">See partner benefits</SecondaryButton>
+      </PageHero>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-        <h2 className="text-xl font-semibold text-slate-900">Submit Partnership Interest</h2>
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Full Name *</label>
-            <input name="name" value={form.name} onChange={handleChange} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Your full name" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Company</label>
-            <input name="company" value={form.company} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Company name" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Phone *</label>
-            <input name="phone" value={form.phone} onChange={handleChange} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Phone number" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Email</label>
-            <input name="email" type="email" value={form.email} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Email address" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Investment Interest</label>
-            <input name="investment_interest" value={form.investment_interest} onChange={handleChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="e.g. ₹50,000 - ₹1,00,000" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700">Message</label>
-            <textarea name="message" value={form.message} onChange={handleChange} rows={4} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="Tell us about your interest..." />
-          </div>
-          <div className="md:col-span-2">
-            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50">
-              {loading ? 'Submitting...' : 'Submit Partnership Request'} <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+      <Section>
+        <div className="mx-auto max-w-3xl">
+          {sent ? (
+            <FormSuccess
+              title="Request received"
+              description="Thanks — we have your details. We will reach out to discuss how a partnership could work."
+              onReset={() => setSent(false)}
+              resetLabel="Submit another request"
+            />
+          ) : (
+            <FormCard
+              title="Submit partnership interest"
+              description="Only name and phone are required. Everything else helps us prepare."
+              onSubmit={handleSubmit}
+              footer={
+                <PrimaryButton type="submit" disabled={loading} className="w-full sm:w-auto">
+                  {loading ? 'Submitting…' : 'Submit request'}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </PrimaryButton>
+              }
+            >
+              <Field
+                id="pt-name"
+                name="name"
+                label="Full name"
+                required
+                value={form.name}
+                onChange={update}
+                error={errors.name}
+                autoComplete="name"
+                placeholder="Your full name"
+              />
+              <Field
+                id="pt-company"
+                name="company"
+                label="Company"
+                value={form.company}
+                onChange={update}
+                autoComplete="organization"
+                placeholder="Optional"
+              />
+              <Field
+                id="pt-phone"
+                name="phone"
+                label="Phone"
+                required
+                type="tel"
+                value={form.phone}
+                onChange={update}
+                error={errors.phone}
+                autoComplete="tel"
+                placeholder="+91 "
+              />
+              <Field
+                id="pt-email"
+                name="email"
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={update}
+                error={errors.email}
+                autoComplete="email"
+                placeholder="you@company.com"
+              />
+              <Field
+                id="pt-interest"
+                name="investment_interest"
+                label="Investment interest"
+                as="select"
+                options={INTEREST}
+                value={form.investment_interest}
+                onChange={update}
+                placeholder="Select what fits"
+                full
+              />
+              <Field
+                id="pt-message"
+                name="message"
+                label="Message"
+                as="textarea"
+                rows={4}
+                full
+                value={form.message}
+                onChange={update}
+                placeholder="Tell us what kind of partnership you have in mind."
+              />
+            </FormCard>
+          )}
+        </div>
+      </Section>
+    </>
   )
 }

@@ -1,51 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, ArrowRight, X as XIcon, Check, Twitter, Instagram, Linkedin, Quote } from 'lucide-react';
+import { ArrowRight, Check, X as XIcon } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
-const OwlLogo = ({ size = 40 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Body */}
-    <ellipse cx="50" cy="62" rx="30" ry="32" fill="#1a1a1a"/>
-    {/* Head */}
-    <ellipse cx="50" cy="35" rx="26" ry="24" fill="#1a1a1a"/>
-    {/* Ear tufts */}
-    <polygon points="30,16 24,4 36,12" fill="#1a1a1a"/>
-    <polygon points="70,16 76,4 64,12" fill="#1a1a1a"/>
-    {/* Face circle */}
-    <ellipse cx="50" cy="37" rx="18" ry="16" fill="#f5f0e8"/>
-    {/* Left eye */}
-    <circle cx="41" cy="34" r="8" fill="white" stroke="#1a1a1a" strokeWidth="2"/>
-    <circle cx="41" cy="34" r="5" fill="#1a1a1a"/>
-    <circle cx="43" cy="32" r="1.5" fill="white"/>
-    {/* Right eye */}
-    <circle cx="59" cy="34" r="8" fill="white" stroke="#1a1a1a" strokeWidth="2"/>
-    <circle cx="59" cy="34" r="5" fill="#1a1a1a"/>
-    <circle cx="61" cy="32" r="1.5" fill="white"/>
-    {/* Beak */}
-    <polygon points="50,40 45,47 55,47" fill="#F97316"/>
-    {/* Wings */}
-    <ellipse cx="23" cy="70" rx="10" ry="20" fill="#1a1a1a" transform="rotate(-10 23 70)"/>
-    <ellipse cx="77" cy="70" rx="10" ry="20" fill="#1a1a1a" transform="rotate(10 77 70)"/>
-    {/* Chest pattern */}
-    <ellipse cx="50" cy="68" rx="16" ry="18" fill="#333"/>
-    {/* Feet */}
-    <path d="M38 92 Q34 96 30 94 M38 92 Q38 97 34 98 M38 92 Q42 97 40 99" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-    <path d="M62 92 Q66 96 70 94 M62 92 Q62 97 66 98 M62 92 Q58 97 60 99" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-  </svg>
-);
+/* ExFlow is a business under ExCompany with its own site. Point this at that
+   site once it is live; changing it here updates the homepage venture link. */
+const EXFLOW_URL = 'https://exflow.dpdns.org/';
 
+/* Header and footer come from the shared SiteLayout. The homepage owns only
+   the content sections below. */
 const SITE_CONTENT = {
-  header: {
-    logo: "EXCOMPANY",
-    navLinks: [
-      { name: "Ventures", href: "#ventures" },
-      { name: "Our Model", href: "#model" },
-      { name: "Why Us", href: "#why-us" },
-      { name: "Connect", href: "#connect" },
-    ],
-    cta: { text: "Start a Conversation", href: "mailto:hello@excompany.in" }
-  },
   hero: {
     label: "Venture Building Studio",
     headline: "Businesses Built to Last. Not Just to Launch.",
@@ -81,64 +47,6 @@ const SITE_CONTENT = {
         title: "YOUR BUSINESS",
         description: "If the model is clear and the execution matters, there may be a place for it here.",
         tag: "Open"
-      }
-    ],
-    tech8Projects: [
-      {
-        id: "scrapco",
-        title: "Scrapco",
-        description: "A smart scrap management app that makes doorstep scrap collection simple, fast, and hassle-free. Users schedule pickups, manage waste efficiently, and promote sustainable recycling.",
-        tag: "Sustainability",
-        image: "/projects/scrapco.png"
-      },
-      {
-        id: "gtc",
-        title: "GTC",
-        description: "A smart GTC management platform that centralizes data from vendors, godowns, and operations into one unified system for enterprise-scale coordination.",
-        tag: "Enterprise",
-        image: "/projects/gtc.png"
-      },
-      {
-        id: "ezdry",
-        title: "EzDry",
-        description: "A smart laundry management app that makes doorstep pickup and laundry services seamless. Users schedule, track, and receive clean clothes with zero hassle.",
-        tag: "On-Demand",
-        image: "/projects/ezdry.png"
-      },
-      {
-        id: "fogg",
-        title: "Fogg Road Safety & Alert System",
-        description: "An intelligent road safety system designed to reduce accidents in foggy conditions. It alerts nearby vehicles and infrastructure in real time using smart sensors.",
-        tag: "Safety & IoT",
-        image: "/projects/fogg.png"
-      },
-      {
-        id: "gurtron",
-        title: "GurTron",
-        description: "A smart school management platform where teachers can create papers, manage academic tasks, and track student real-time performance with detailed analytics.",
-        tag: "Education",
-        image: "/projects/gurtron.png"
-      },
-      {
-        id: "fleet",
-        title: "Fleet Management & Transportation",
-        description: "An advanced fleet management platform that provides real-time vehicle tracking, fuel efficiency monitoring, and zonal route optimisation for logistics businesses.",
-        tag: "Logistics",
-        image: "/projects/fleet.png"
-      },
-      {
-        id: "restaurant",
-        title: "Restaurant Management App",
-        description: "A smart food tokenization system where customers scan a QR code to order directly from their table. Orders are managed through live token numbers for frictionless service.",
-        tag: "Food & Hospitality",
-        image: "/projects/restaurant.png"
-      },
-      {
-        id: "policylens",
-        title: "PolicyLens",
-        description: "A full-featured insurance broker portal that helps agents manage clients, track policies, renewals, premiums, and commissions — all in one place. Built-in AI Assistant surfaces coverage gaps and upsell opportunities, while real-time analytics give brokers a clear view of their entire book of business.",
-        tag: "InsurTech",
-        image: "/projects/policylens.png"
       }
     ]
   },
@@ -179,148 +87,11 @@ const SITE_CONTENT = {
       }
     ]
   },
-  testimonials: {
-    heading: "From the Founders",
-    list: [
-      {
-        quote: "Building with EXCOMPANY means you're never building alone. They bring the structure, the energy, and the willingness to get their hands dirty alongside you.",
-        name: "Founder, EXFLOW"
-      },
-      {
-        quote: "MOMO REHDI wouldn't exist the way it does without EXCOMPANY's belief in the model and their push to make every detail right.",
-        name: "Founder, MOMO REHDI"
-      }
-    ]
-  },
-  inTheField: {
-    heading: "In the Field",
-    subtext: "EXCOMPANY and its ventures are active in tech, food, and the business of building.",
-    cards: [
-      {
-        tag: "Technology",
-        title: "Simplifying the complex",
-        text: "How EXFLOW is rethinking the way teams manage knowledge and daily workflows without the enterprise bloat."
-      },
-      {
-        tag: "Street Food",
-        title: "The honest food model",
-        text: "Scaling a high-volume, low-margin business requires operations that border on obsession."
-      },
-      {
-        tag: "Venture Building",
-        title: "Why we don't just invest",
-        text: "Capital is a commodity. Execution is not. A look into our model for building practical companies."
-      }
-    ]
-  },
   connect: {
     heading: "Let's Make the Next Move Worth Making.",
     subtext: "Tell us what you're building, what's missing, or what should exist in your market.",
     email: "hello@excompany.in"
-  },
-  footer: {
-    tagline: "Built for useful businesses.",
-    copyright: "© 2026 EXCOMPANY · Built for useful businesses.",
-    ventures: ["EXFLOW", "MOMO REHDI", "Your Business"],
-    company: ["Our Model", "Why Us", "Connect"],
-    contact: ["hello@excompany.in", "New Delhi & Beyond"]
   }
-};
-
-const Header = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  return (
-    <header 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "bg-white/95 backdrop-blur-md border-b border-border py-4 shadow-sm" : "bg-transparent py-6"
-      }`}
-    >
-      <div className="container mx-auto px-6 max-w-7xl flex items-center justify-between">
-        <a href="#" className="flex items-center gap-3">
-          <OwlLogo size={44} />
-          <span style={{ fontFamily: "'Nunito', sans-serif" }} className="font-extrabold text-2xl text-[#F97316] lowercase tracking-tight">
-            excompany
-          </span>
-        </a>
-
-        <nav className="hidden md:flex items-center gap-8">
-          {SITE_CONTENT.header.navLinks.map((link) => (
-            <a 
-              key={link.name} 
-              href={link.href}
-              className="text-sm font-bold text-gray-600 hover:text-black transition-colors uppercase tracking-wider"
-            >
-              {link.name}
-            </a>
-          ))}
-          <Link to="/admin-login" className="text-sm font-bold text-gray-600 hover:text-black transition-colors uppercase tracking-wider">
-            Admin
-          </Link>
-          <Link to="/dce" className="text-sm font-bold text-primary hover:text-orange-600 transition-colors uppercase tracking-wider">
-            DCE
-          </Link>
-        </nav>
-
-        <a 
-          href={SITE_CONTENT.header.cta.href}
-          className="hidden md:inline-flex px-6 py-3 bg-primary text-primary-foreground text-sm font-bold rounded-full hover:bg-orange-600 transition-colors shadow-sm"
-        >
-          {SITE_CONTENT.header.cta.text}
-        </a>
-
-        <button 
-          className="md:hidden p-2 text-black"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? <XIcon size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-border p-6 flex flex-col gap-6 shadow-xl">
-          {SITE_CONTENT.header.navLinks.map((link) => (
-            <a 
-              key={link.name} 
-              href={link.href}
-              className="text-lg font-bold uppercase tracking-wide"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              {link.name}
-            </a>
-          ))}
-          <Link
-            to="/admin-login"
-            className="text-lg font-bold uppercase tracking-wide"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Admin
-          </Link>
-          <Link
-            to="/dce"
-            className="text-lg font-bold uppercase tracking-wide text-primary"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            DCE
-          </Link>
-          <a 
-            href={SITE_CONTENT.header.cta.href}
-            className="px-6 py-4 bg-primary text-primary-foreground text-center font-bold rounded-full"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            {SITE_CONTENT.header.cta.text}
-          </a>
-        </div>
-      )}
-    </header>
-  );
 };
 
 const HeroAbstractArt = () => {
@@ -436,7 +207,7 @@ const Marquee = () => {
 
 const VenturesSection = () => {
   return (
-    <section id="ventures" className="py-24 bg-white">
+    <section id="ventures" className="scroll-mt-24 py-24 bg-white">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="text-center max-w-3xl mx-auto mb-20">
           <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Our Portfolio</h2>
@@ -473,8 +244,13 @@ const VenturesSection = () => {
               <p className="text-xl text-muted-foreground mb-10 leading-relaxed">
                 {SITE_CONTENT.ventures.list[0].description}
               </p>
-              <a href="#" className="inline-flex items-center gap-2 text-primary font-bold hover:gap-4 transition-all text-lg border-b-2 border-transparent hover:border-primary pb-1">
-                View Venture <ArrowRight size={20} />
+              <a
+                href={EXFLOW_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-primary font-bold hover:gap-4 transition-all text-lg border-b-2 border-transparent hover:border-primary pb-1"
+              >
+                Visit ExFlow <ArrowRight size={20} />
               </a>
             </div>
           </motion.div>
@@ -576,57 +352,6 @@ const VenturesSection = () => {
             </div>
           </div>
 
-          {/* ===================== TECH PORTFOLIO (horizontal smooth scroll) ===================== */}
-          <div className="bg-white border border-border rounded-3xl p-6 md:p-12">
-            <div className="flex items-center justify-between mb-10">
-              <div>
-                <h4 className="text-2xl md:text-3xl font-display font-bold text-black mb-2">Tech Portfolio</h4>
-                <p className="text-muted-foreground">Products built and shipped by EXFLOW — swipe to explore</p>
-              </div>
-              <span className="hidden md:inline-flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-wider border-b-2 border-primary pb-1">
-                {SITE_CONTENT.ventures.tech8Projects.length} Projects
-              </span>
-            </div>
-
-            <div className="momentum-scroll flex gap-5 overflow-x-auto pb-5 snap-x snap-mandatory scroll-smooth -mx-6 px-6 md:-mx-12 md:px-12">
-              {SITE_CONTENT.ventures.tech8Projects.map((project, i) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  viewport={{ once: true }}
-                  className="group snap-start shrink-0 w-[82%] sm:w-[360px] border border-border rounded-2xl overflow-hidden bg-[#FAFAF8] hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col"
-                >
-                  {/* Project preview area — full image, no crop */}
-                  <div className="aspect-[16/10] bg-white relative overflow-hidden flex items-center justify-center border-b border-border">
-                    <img
-                      src={project.image}
-                      alt={project.title}
-                      loading="lazy"
-                      className="w-full h-full object-contain group-hover:scale-[1.03] transition-transform duration-500"
-                    />
-                    <div className="absolute top-3 left-3">
-                      <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-bold text-primary shadow-sm border border-white/50">
-                        {project.tag}
-                      </span>
-                    </div>
-                  </div>
-                  {/* Project info */}
-                  <div className="p-5 flex flex-col flex-grow">
-                    <h5 className="font-display font-bold text-black text-base mb-2">{project.title}</h5>
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 flex-grow">{project.description}</p>
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{project.tag}</span>
-                      <span className="text-primary font-bold text-sm inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                        View <ArrowRight size={14} />
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -635,7 +360,7 @@ const VenturesSection = () => {
 
 const WhyUsSection = () => {
   return (
-    <section id="why-us" className="py-24 bg-[#111111] text-white">
+    <section id="why-us" className="scroll-mt-24 py-24 bg-[#111111] text-white">
       <div className="container mx-auto px-6 max-w-6xl">
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-20 text-center max-w-3xl mx-auto leading-tight">
           {SITE_CONTENT.whyUs.heading}
@@ -683,7 +408,7 @@ const WhyUsSection = () => {
 
 const ModelSection = () => {
   return (
-    <section id="model" className="py-24 bg-background">
+    <section id="model" className="scroll-mt-24 py-24 bg-background">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="mb-20">
           <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">How We Work</h2>
@@ -716,81 +441,61 @@ const ModelSection = () => {
   );
 };
 
-const TestimonialsSection = () => {
-  return (
-    <section className="py-24 bg-white border-y border-border">
-      <div className="container mx-auto px-6 max-w-6xl">
-        <h2 className="text-3xl md:text-4xl font-display font-bold mb-16 text-center text-black">
-          {SITE_CONTENT.testimonials.heading}
-        </h2>
+/* ConnectSection — the homepage contact form.
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {SITE_CONTENT.testimonials.list.map((t, i) => (
-            <div key={i} className="bg-background border border-border rounded-3xl p-8 md:p-12 flex flex-col">
-              <Quote className="text-primary mb-8" size={40} fill="currentColor" fillOpacity={0.2} />
-              <p className="text-xl md:text-2xl font-medium leading-relaxed mb-12 flex-grow text-black">
-                "{t.quote}"
-              </p>
-              <div className="flex items-center gap-4 mt-auto">
-                <div className="w-14 h-14 bg-gray-200 rounded-full overflow-hidden flex items-center justify-center border border-border">
-                  <span className="text-gray-500 font-bold font-display text-xl">F</span>
-                </div>
-                <span className="font-bold font-display text-lg text-black">{t.name}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
+   This form used to be a lie. Its handler was:
 
-const InTheFieldSection = () => {
-  return (
-    <section className="py-24 bg-background">
-      <div className="container mx-auto px-6 max-w-6xl">
-        <div className="mb-16 md:flex justify-between items-end gap-8">
-          <div className="max-w-2xl">
-            <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 text-black">
-              {SITE_CONTENT.inTheField.heading}
-            </h2>
-            <p className="text-xl text-muted-foreground">
-              {SITE_CONTENT.inTheField.subtext}
-            </p>
-          </div>
-        </div>
+     onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {SITE_CONTENT.inTheField.cards.map((card, i) => (
-            <div key={i} className="group cursor-pointer">
-              <div className="aspect-[4/3] bg-gray-100 rounded-2xl mb-6 overflow-hidden relative border border-border">
-                <div className="absolute inset-0 bg-gray-200 group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute top-4 left-4 bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full text-primary shadow-sm">
-                  {card.tag}
-                </div>
-              </div>
-              <h3 className="text-2xl font-display font-bold mb-3 group-hover:text-primary transition-colors text-black">
-                {card.title}
-              </h3>
-              <p className="text-muted-foreground mb-6 line-clamp-3 leading-relaxed">
-                {card.text}
-              </p>
-              <span className="text-primary font-bold inline-flex items-center gap-2 group-hover:gap-4 transition-all">
-                Read more <ArrowRight size={16} />
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
+   It showed a green tick and "Message Sent — thanks, we'll be in touch soon"
+   without sending anything anywhere. Every visitor who filled it in believed
+   they had contacted the company, and the lead was silently discarded. On a
+   homepage, that is the most expensive bug on the site.
 
+   It now writes to the same `enquiries` table as the enquiry modal, reports
+   real failures, and only claims success once the insert has actually
+   returned. */
 const ConnectSection = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', details: '' });
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (sending) return;
+    setError('');
+    setSending(true);
+    try {
+      if (!supabase) throw new Error('Cannot reach the server right now.');
+      const { error: insertError } = await supabase.from('enquiries').insert([
+        {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          project_details: form.details.trim(),
+          // The table requires these, and the homepage form deliberately stays
+          // short — the enquiry modal collects the rest.
+          company: '',
+          phone: '',
+          budget: '',
+          timeline: '',
+        },
+      ]);
+      if (insertError) throw new Error(insertError.message);
+      setSubmitted(true);
+      setForm({ name: '', email: '', details: '' });
+      toast.success('Message sent. We will be in touch.');
+    } catch (err: any) {
+      const message = err?.message || 'Could not send your message.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
-    <section id="connect" className="py-24 bg-white border-t border-border">
+    <section id="connect" className="scroll-mt-24 py-24 bg-white border-t border-border">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
           <div>
@@ -818,25 +523,61 @@ const ConnectSection = () => {
                 </button>
               </div>
             ) : (
-              <form 
-                onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}
-                className="space-y-6"
-              >
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">Name</label>
-                  <input type="text" required className="w-full bg-white border border-border rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg" placeholder="Jane Doe" />
+                  <label htmlFor="home-name" className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">Name</label>
+                  <input
+                    id="home-name"
+                    type="text"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    autoComplete="name"
+                    className="w-full bg-white border border-border rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg"
+                    placeholder="Jane Doe"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">Email</label>
-                  <input type="email" required className="w-full bg-white border border-border rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg" placeholder="jane@example.com" />
+                  <label htmlFor="home-email" className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">Email</label>
+                  <input
+                    id="home-email"
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    autoComplete="email"
+                    className="w-full bg-white border border-border rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg"
+                    placeholder="jane@example.com"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">What are you building?</label>
-                  <textarea required className="w-full bg-white border border-border rounded-2xl px-6 py-4 h-40 resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg" placeholder="Tell us about your venture..."></textarea>
+                  <label htmlFor="home-details" className="block text-sm font-bold mb-2 text-black uppercase tracking-wider">What are you building?</label>
+                  <textarea
+                    id="home-details"
+                    required
+                    value={form.details}
+                    onChange={(e) => setForm({ ...form, details: e.target.value })}
+                    className="w-full bg-white border border-border rounded-2xl px-6 py-4 h-40 resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow text-lg"
+                    placeholder="Tell us about your venture..."
+                  />
                 </div>
-                <button type="submit" className="w-full bg-primary text-primary-foreground font-bold text-xl rounded-full py-5 mt-4 hover:bg-orange-600 transition-colors shadow-lg shadow-primary/20">
-                  Submit Details
+
+                {error && (
+                  <p role="alert" className="rounded-2xl bg-red-50 border border-red-200 px-5 py-3 text-base font-medium text-red-700">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full bg-primary text-primary-foreground font-bold text-xl rounded-full py-5 mt-4 hover:bg-orange-600 transition-colors shadow-lg shadow-primary/20 disabled:opacity-70"
+                >
+                  {sending ? 'Sending…' : 'Submit Details'}
                 </button>
+                <p className="text-center text-sm text-muted-foreground">
+                  Prefer more detail? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open-enquire'))} className="font-bold text-primary hover:underline">Use the full enquiry form</button>
+                </p>
               </form>
             )}
           </div>
@@ -846,78 +587,17 @@ const ConnectSection = () => {
   );
 };
 
-const Footer = () => {
-  return (
-    <footer className="bg-[#111111] text-white py-20">
-      <div className="container mx-auto px-6 max-w-6xl">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
-          <div className="col-span-1 md:col-span-1">
-            <div className="flex items-center gap-3 mb-6">
-              <OwlLogo size={38} />
-              <span style={{ fontFamily: "'Nunito', sans-serif" }} className="font-extrabold text-xl text-[#F97316] lowercase tracking-tight">
-                excompany
-              </span>
-            </div>
-            <p className="text-gray-400 font-medium text-lg max-w-[200px]">
-              {SITE_CONTENT.footer.tagline}
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-display font-bold text-xl mb-6 text-white">Ventures</h4>
-            <ul className="space-y-4 text-gray-400 font-medium">
-              {SITE_CONTENT.footer.ventures.map(link => (
-                <li key={link}><a href="#ventures" className="hover:text-primary transition-colors">{link}</a></li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-display font-bold text-xl mb-6 text-white">Company</h4>
-            <ul className="space-y-4 text-gray-400 font-medium">
-              {SITE_CONTENT.footer.company.map((link, i) => {
-                const hrefs = ["#model", "#why-us", "#connect"];
-                return (
-                  <li key={link}><a href={hrefs[i]} className="hover:text-primary transition-colors">{link}</a></li>
-                );
-              })}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-display font-bold text-xl mb-6 text-white">Contact</h4>
-            <ul className="space-y-4 text-gray-400 font-medium">
-              <li><a href={`mailto:${SITE_CONTENT.footer.contact[0]}`} className="hover:text-primary transition-colors">{SITE_CONTENT.footer.contact[0]}</a></li>
-              <li>{SITE_CONTENT.footer.contact[1]}</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="pt-8 border-t border-[#333] flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-gray-500 font-medium">{SITE_CONTENT.footer.copyright}</p>
-          <div className="flex items-center gap-6 text-gray-400">
-            <a href="#" className="hover:text-white transition-colors p-2 bg-[#222] rounded-full hover:bg-primary"><Twitter size={20} /></a>
-            <a href="#" className="hover:text-white transition-colors p-2 bg-[#222] rounded-full hover:bg-primary"><Instagram size={20} /></a>
-            <a href="#" className="hover:text-white transition-colors p-2 bg-[#222] rounded-full hover:bg-primary"><Linkedin size={20} /></a>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
-
+/* The header and footer now come from SiteLayout, shared with every other
+   marketing page. This component renders only the homepage's own sections. */
 export default function ExflowHome() {
   return (
-    <div className="exflow-site min-h-screen bg-background text-foreground selection:bg-primary selection:text-white font-sans">
-      <Header />
-      <main>
-        <HeroSection />
-        <Marquee />
-        <VenturesSection />
-        <WhyUsSection />
-        <ConnectSection />
-      </main>
-      <Footer />
+    <div className="text-foreground selection:bg-primary selection:text-white font-sans">
+      <HeroSection />
+      <Marquee />
+      <VenturesSection />
+      <ModelSection />
+      <WhyUsSection />
+      <ConnectSection />
     </div>
   );
 }

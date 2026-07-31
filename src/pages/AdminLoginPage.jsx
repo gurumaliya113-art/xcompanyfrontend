@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { LogIn, Shield, ArrowRight, Eye, EyeOff, UserCheck, FileText, FilePlus, Link as LinkIcon, ListChecks } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { backend } from '../lib/api'
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
@@ -31,39 +32,30 @@ export default function AdminLoginPage() {
   const [newMeetingLink, setNewMeetingLink] = useState('')
   const [newMeetingNotes, setNewMeetingNotes] = useState('')
 
-  async function _hashPw(pw) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  }
-
+  // PM login now goes through the backend instead of reading pm_login_users
+  // (and its password hashes) directly with the anon key. The client no longer
+  // touches the hash at all — it sends the plain password over HTTPS and the
+  // server verifies it. This is what lets the table be locked to service-role.
   async function handlePMLogin() {
     if (!pmUsername.trim() || !pmPassword.trim()) {
-      toast.error('Username aur Password daalo')
+      toast.error('Enter username and password')
       return
     }
     setPmLoading(true)
     setPmMsg('')
     try {
-      const hash = await _hashPw(pmPassword.trim())
-      const { data, error } = await supabase
-        .from('pm_login_users')
-        .select('id,name,username')
-        .eq('username', pmUsername.trim())
-        .eq('password_hash', hash)
-        .maybeSingle()
-      if (error) throw error
-      if (!data) {
-        setPmMsg('Invalid username or password')
-        toast.error('Invalid username or password')
-        return
-      }
-      localStorage.setItem('xco_pm_employee_id', data.id)
-      localStorage.setItem('xco_pm_employee_label', data.name)
-      toast.success('PM login successful!')
-      window.location.href = '/pm.html'
+      const { user } = await backend.pmLogin({
+        username: pmUsername.trim(),
+        password: pmPassword.trim(),
+      })
+      localStorage.setItem('xco_pm_employee_id', user.id)
+      localStorage.setItem('xco_pm_employee_label', user.name)
+      toast.success('Signed in')
+      navigate('/app/overview')
     } catch (err) {
-      setPmMsg(err.message || 'Login failed')
-      toast.error(err.message || 'Login failed')
+      const message = err.message || 'Login failed'
+      setPmMsg(message)
+      toast.error(message)
     } finally {
       setPmLoading(false)
     }

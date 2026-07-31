@@ -101,86 +101,11 @@ export default function Portfolio() {
   const project = allProjects[current];
 
   return (
-    <div className="bge-site min-h-screen" style={{ backgroundColor: "#f3f4f6" }}>
-      {/* Header */}
-      <header
-        style={{ backgroundColor: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
-        className="sticky top-0 z-50"
-      >
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 sm:py-4 md:px-8 flex items-center justify-between gap-3">
-          <Link
-            to="/"
-            className="flex items-center gap-2"
-            style={{ textDecoration: "none" }}
-          >
-            <div
-              style={{
-                backgroundColor: "#1976D2",
-                borderRadius: "50%",
-                width: 34,
-                height: 34,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>S</span>
-            </div>
-            <span style={{ fontWeight: 700, color: "#111", fontSize: 18 }}>Our Work</span>
-          </Link>
-          <nav
-            className="hidden md:flex items-center gap-8"
-            style={{ fontSize: 14, fontWeight: 500, color: "#555" }}
-          >
-            <Link to="/" style={{ color: "#555", textDecoration: "none" }}>
-              Home
-            </Link>
-            <Link to="/portfolio" style={{ color: "#1976D2", textDecoration: "none", fontWeight: 600 }}>
-              Our Work
-            </Link>
-            <a
-              href="#"
-              style={{ color: "#555", textDecoration: "none" }}
-              onMouseOver={(e) => (e.currentTarget.style.color = "#1976D2")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "#555")}
-            >
-              Solutions
-            </a>
-            <a
-              href="#"
-              style={{ color: "#555", textDecoration: "none" }}
-              onMouseOver={(e) => (e.currentTarget.style.color = "#1976D2")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "#555")}
-            >
-              About
-            </a>
-            <a
-              href="#"
-              style={{ color: "#555", textDecoration: "none" }}
-              onMouseOver={(e) => (e.currentTarget.style.color = "#1976D2")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "#555")}
-            >
-              Contact
-            </a>
-            <Link
-              to="/admin-login"
-              style={{ color: "#555", textDecoration: "none" }}
-              onMouseOver={(e) => (e.currentTarget.style.color = "#1976D2")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "#555")}
-            >
-              Admin
-            </Link>
-          </nav>
-          <button
-            type="button"
-            onClick={openEnquire}
-            className="shrink-0 rounded-md border-0 bg-[#f97316] px-3 py-2 text-[12px] font-semibold text-white sm:px-5 sm:py-2.5 sm:text-sm"
-          >
-            Request A Quote
-          </button>
-        </div>
-      </header>
-
+    /* No min-h-screen here: the shared layout already fills the viewport, and
+       stacking both produced a page one viewport taller than its content.
+       No theme scope either — this page styles everything with literal colours
+       and inline styles, so it never depended on the token set. */
+    <div style={{ backgroundColor: "#f3f4f6" }}>
       {/* Slider section */}
       <section
         style={{
