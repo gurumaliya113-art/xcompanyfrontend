@@ -110,6 +110,19 @@ export default function SiteHeader() {
               </a>
             ))}
           {isHome && <span className="h-4 w-px bg-black/10" aria-hidden="true" />}
+          {/* On inner pages there are no section anchors, so a plain Home link
+              is the clear way back — the logo alone was not obvious enough. */}
+          {!isHome && (
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `${linkBase} ${isActive ? 'text-[#F97316]' : 'text-gray-600 hover:text-black'}`
+              }
+            >
+              Home
+            </NavLink>
+          )}
           {NAV.map((l) => (
             <NavLink
               key={l.to}
@@ -169,6 +182,20 @@ export default function SiteHeader() {
                   ))}
                   <hr className="my-2 border-black/10" />
                 </>
+              )}
+              {!isHome && (
+                <NavLink
+                  to="/"
+                  end
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `rounded-xl px-3 py-3 text-base font-bold uppercase tracking-wide transition-colors ${
+                      isActive ? 'bg-orange-50 text-[#F97316]' : 'text-gray-800 hover:bg-gray-50'
+                    }`
+                  }
+                >
+                  Home
+                </NavLink>
               )}
               {NAV.map((l) => (
                 <NavLink
