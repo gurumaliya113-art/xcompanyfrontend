@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Phone, Mail, MapPin, Send, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { emailLeadToOwner } from '../lib/notify'
 import OwlLogo from './site/OwlLogo'
 
 const EMPTY = {
@@ -43,7 +44,7 @@ export default function EnquireModal() {
     }
     setLoading(true)
     try {
-      const { error } = await supabase.from('enquiries').insert([{
+      const row = {
         name: form.name,
         company: form.company,
         phone: form.phone,
@@ -51,8 +52,10 @@ export default function EnquireModal() {
         project_details: form.project_details,
         budget: form.budget,
         timeline: form.timeline,
-      }])
+      }
+      const { error } = await supabase.from('enquiries').insert([row])
       if (error) throw error
+      await emailLeadToOwner('New ExCompany enquiry', row)
       toast.success('Enquiry submitted! We will get back to you soon.')
       setForm(EMPTY)
       setOpen(false)

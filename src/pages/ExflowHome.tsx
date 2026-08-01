@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Check, X as XIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { emailLeadToOwner } from '@/lib/notify';
 
 /* ExFlow is a business under ExCompany with its own site. Point this at that
    site once it is live; changing it here updates the homepage venture link. */
@@ -468,20 +469,20 @@ const ConnectSection = () => {
     setSending(true);
     try {
       if (!supabase) throw new Error('Cannot reach the server right now.');
-      const { error: insertError } = await supabase.from('enquiries').insert([
-        {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          project_details: form.details.trim(),
-          // The table requires these, and the homepage form deliberately stays
-          // short — the enquiry modal collects the rest.
-          company: '',
-          phone: '',
-          budget: '',
-          timeline: '',
-        },
-      ]);
+      const row = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        project_details: form.details.trim(),
+        // The table requires these, and the homepage form deliberately stays
+        // short — the enquiry modal collects the rest.
+        company: '',
+        phone: '',
+        budget: '',
+        timeline: '',
+      };
+      const { error: insertError } = await supabase.from('enquiries').insert([row]);
       if (insertError) throw new Error(insertError.message);
+      await emailLeadToOwner('New ExCompany enquiry (homepage)', row);
       setSubmitted(true);
       setForm({ name: '', email: '', details: '' });
       toast.success('Message sent. We will be in touch.');
